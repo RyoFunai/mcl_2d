@@ -1,0 +1,6 @@
+image: iscas_museum_map.pgm
+resolution: 0.050000
+origin: [-9.461811, -9.107068, 0.000000]
+negate: 1
+occupied_thresh: 0.65
+free_thresh: 0.196
