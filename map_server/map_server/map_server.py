@@ -25,6 +25,7 @@ class MapServer(Node):
     yaml_directory = os.path.dirname(map_yaml_path)
     map_image_path = os.path.join(yaml_directory, map_data['image'])
     image = Image.open(map_image_path)
+    image = image.transpose(Image.FLIP_TOP_BOTTOM)  # 画像と地図の座標系が違うためy軸方向を反転
     map_image = np.array(image)
     
     occupancy_grid_data = np.zeros_like(map_image, dtype=int)

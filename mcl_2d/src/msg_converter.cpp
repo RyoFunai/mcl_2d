@@ -11,7 +11,6 @@ geometry_msgs::msg::TransformStamped MsgConverter::broadcastWorldToBaseLink(cons
   world_to_base_link.header.stamp    = ros_clock.now();
   world_to_base_link.header.frame_id = "map";
   world_to_base_link.child_frame_id  = "base_link";
-  // base_link の絶対位置と向きを設定
   world_to_base_link.transform.translation.x = x;
   world_to_base_link.transform.translation.y = y;
   world_to_base_link.transform.rotation.z    = sin(yaw / 2.0);
@@ -46,7 +45,7 @@ geometry_msgs::msg::PoseArray MsgConverter::createParticleCloud(std::vector<Mcl2
 
   geometry_msgs::msg::PoseArray pose_array_msg;
   pose_array_msg.header.stamp    = ros_clock.now();
-  pose_array_msg.header.frame_id = "map";  // 適切なフレームIDに変更してください
+  pose_array_msg.header.frame_id = "map";
 
   // パーティクルをPoseArrayに追加
   for (const auto& particle : particles) {
@@ -107,10 +106,9 @@ sensor_msgs::msg::PointCloud2 MsgConverter::createTransformedPC2(Eigen::Matrix4X
     vector<LaserPoint> src_points;
     for(size_t i=0; i< msg->ranges.size(); ++i) {
       LaserPoint src_point;
-      if(msg->ranges[i] > 12 || msg->ranges[i] < 0.5) continue; //# 範囲データ [m] (注: range_min または > range_max の値は破棄する必要があります)
-        //msg->angle_min->スキャン開始角度 [rad, msg->->angle_increment->測定値間の角度距離 [rad］
+      if(msg->ranges[i] > 12 || msg->ranges[i] < 0.5) continue;
         double x = msg->ranges[i] * cos(msg->angle_min + msg->angle_increment * i);//極座標
-        double y = -msg->ranges[i] * sin(msg->angle_min + msg->angle_increment * i);
+        double y = msg->ranges[i] * sin(msg->angle_min + msg->angle_increment * i);
         src_point.x = x * cos(laser[2]) - y * sin(laser[2]) + laser[0];//直交座標
         src_point.y = x * sin(laser[2]) + y * cos(laser[2]) + laser[1];
         src_points.push_back(src_point);

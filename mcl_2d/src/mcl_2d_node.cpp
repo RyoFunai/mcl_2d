@@ -30,7 +30,7 @@ void Mcl2dNode::odom_callback(const nav_msgs::msg::Odometry::SharedPtr msg) {
 }
 
 void Mcl2dNode::broadcastTransforms() {
-  std::vector<double> tf_laser2robot = {1.0, 2.0, 0.0, 0.1, 0.2, 0.3};
+  std::vector<double> tf_laser2robot = {1.0, 2.0, 0.0, 0.0, 0.0, 0.0};
   geometry_msgs::msg::TransformStamped world_to_base_link = msg_converter.broadcastWorldToBaseLink(odom[0], odom[1], odom[2]);
   geometry_msgs::msg::TransformStamped base_link_to_lidar = msg_converter.broadcastBaseLinkToLidarFrame(tf_laser2robot);
   broadcaster->sendTransform(world_to_base_link);
