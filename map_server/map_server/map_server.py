@@ -5,19 +5,30 @@ import yaml
 import numpy as np
 from PIL import Image
 import os
+from pathlib import Path
 
+# class MapServer(Node):
+#   def __init__(self):
+#     super().__init__('map_server')
+#     self.publisher_ = self.create_publisher(OccupancyGrid, 'map', 10)
+#     self.timer = self.create_timer(1, self.publish_map)
+
+#     script_directory = Path(__file__).resolve().parent
+#     map_yaml_path = script_directory / "../../config/maps/iscas_museum_map.yaml"
+#     map_yaml_path = map_yaml_path.resolve()  # Resolve the path to an absolute path
+    
+#     self.map_msg = self.load_map(map_yaml_path)
 
 class MapServer(Node):
   def __init__(self):
     super().__init__('map_server')
     self.publisher_ = self.create_publisher(OccupancyGrid, 'map', 10)
     self.timer = self.create_timer(1, self.publish_map)
-    
-    script_directory = os.path.dirname(os.path.abspath(__file__))
-    
-    map_yaml_path = os.path.join(script_directory, "../../config/maps/iscas_museum_map.yaml")
-    self.map_msg = self.load_map(map_yaml_path)
 
+    self.declare_parameter('yaml_filename', '')  # パラメータを宣言
+    map_yaml_path = self.get_parameter('yaml_filename').get_parameter_value().string_value  # パラメータ値を取得
+
+    self.map_msg = self.load_map(map_yaml_path)
 
   def load_map(self, map_yaml_path):
     with open(map_yaml_path, 'r') as file:

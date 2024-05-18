@@ -1,39 +1,45 @@
-import os
 from launch import LaunchDescription
 from launch_ros.actions import Node
-from launch.substitutions import LaunchConfiguration
-from launch.conditions import IfCondition
-from ament_index_python.packages import get_package_share_directory
+from pathlib import Path
+
 
 def generate_launch_description():
-  package_dir = get_package_share_directory('mcl_2d')
+  script_directory = Path(__file__).resolve().parent
+  
+  map_param_path = script_directory / "../config/maps/iscas_museum_map.yaml"
+  map_param_path = map_param_path.resolve()
+  
+  mcl_2d_param_path = script_directory / "../config/param/mcl_2d.yaml"
+  mcl_2d_param_path = mcl_2d_param_path.resolve()
+  
+  rviz_config_file = script_directory / "../config/rviz2/mcl_2d.rviz"
+  rviz_config_file = rviz_config_file.resolve()
+  
 
-  map_file_path = os.path.join(package_dir, 'config', 'maps', 'iscas_museum_map.yaml')
-  rviz_config_file = os.path.join(package_dir, 'config', 'rviz2', 'mcl_2d.rviz')
-
-  mcl_2d = Node(package='mcl_2d',
+  mcl_2d = Node(
+    package='mcl_2d',
     executable='mcl_2d',
     name='mcl_2d',
     output='log',
+    parameters=[mcl_2d_param_path]
   )
-  
 
   map_server = Node(
-      package='map_server',
-      executable='map_server',
-      name='map_server',
-      output='screen',
-      parameters=[{'yaml_filename': map_file_path}]
+    package='map_server',
+    executable='map_server',
+    name='map_server',
+    output='screen',
+    parameters=[{'yaml_filename': str(map_param_path)}]
   )
 
-  rviz2 = Node(package='rviz2',
+  rviz2 = Node(
+    package='rviz2',
     executable='rviz2',
     name='rviz2',
     output='log',
-    arguments=['-d', rviz_config_file],
+    arguments=['-d', str(rviz_config_file)]
   )
-  
-  
+
   ld = LaunchDescription()
   ld.add_action(mcl_2d)
   ld.add_action(map_server)

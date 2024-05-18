@@ -38,6 +38,7 @@ private:
   rclcpp::QoS _qos = rclcpp::QoS(40).keep_all();
 
   Vector3d odom = Vector3d::Zero();
+  Vector3d laser = Vector3d::Zero();
 
   MsgConverter msg_converter;
   Util util;

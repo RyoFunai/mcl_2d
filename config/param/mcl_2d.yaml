@@ -1,0 +1,9 @@
+# mcl_2d:
+#   ros__parameters:
+#     param_name: UAAAAAAAAAAAAAAAAAAAAAAAAAAA!!
+#     # 他のパラメータをここに追加
+
+/**:
+  ros__parameters:
+    param_name: UAAAAAAAAAAAAAAAAAAAAAAAAAAA!!
+    interval_time: 700

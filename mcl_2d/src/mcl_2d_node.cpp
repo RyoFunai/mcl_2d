@@ -1,8 +1,7 @@
 #include <cstdio>
-
 #include "mcl_2d/mcl_2d_node.hpp"
 
-Mcl2dNode::Mcl2dNode() : Node("mcl_2d_node") {
+Mcl2dNode::Mcl2dNode() : Node("mcl_2d") {
   laser_subscription = this->create_subscription<sensor_msgs::msg::LaserScan>(
       "scan", 10, std::bind(&Mcl2dNode::laser_callback, this, std::placeholders::_1));
   odom_subscription = this->create_subscription<nav_msgs::msg::Odometry>(
@@ -12,6 +11,14 @@ Mcl2dNode::Mcl2dNode() : Node("mcl_2d_node") {
   pc2_mapped_publisher = this->create_publisher<sensor_msgs::msg::PointCloud2>("pc2_mapped", _qos);
   particle_publisher   = this->create_publisher<geometry_msgs::msg::PoseArray>("particlecloud", _qos);
   broadcaster         = std::make_shared<tf2_ros::TransformBroadcaster>(*this);
+
+  this->declare_parameter<string>("param_name", "aaaaaa");
+  std::string param_value = this->get_parameter("param_name").as_string();
+  RCLCPP_INFO(this->get_logger(), "param_value : %s", param_value.c_str());
+
+  this->declare_parameter<int>("interval_time", 0);
+  int interval_time = this->get_parameter("interval_time").as_int();
+  RCLCPP_INFO(this->get_logger(), "interval : %d", interval_time);
 }
 
 void Mcl2dNode::laser_callback(const sensor_msgs::msg::LaserScan::SharedPtr msg){
@@ -41,6 +48,7 @@ int main(int argc, char ** argv){
   rclcpp::init(argc, argv);
 
   auto node = std::make_shared<Mcl2dNode>();
+
   rclcpp::spin(node);
 
   rclcpp::shutdown();
