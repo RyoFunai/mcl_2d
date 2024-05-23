@@ -4,6 +4,38 @@
 
 #include <geometry_msgs/msg/pose_array.hpp>
 
+geometry_msgs::msg::TransformStamped MsgConverter::broadcastWorldToBaseLink(const Vector3d& pose) {
+  geometry_msgs::msg::TransformStamped world_to_base_link;
+
+  rclcpp::Clock ros_clock(RCL_SYSTEM_TIME);
+  world_to_base_link.header.stamp    = ros_clock.now();
+  world_to_base_link.header.frame_id = "map";
+  world_to_base_link.child_frame_id  = "base_link_";
+  // base_link の絶対位置と向きを設定
+  world_to_base_link.transform.translation.x = pose[0];
+  world_to_base_link.transform.translation.y = pose[1];
+  world_to_base_link.transform.rotation.z    = sin(pose[2] / 2.0);
+  world_to_base_link.transform.rotation.w    = cos(pose[2] / 2.0);
+
+  return world_to_base_link;
+}
+
+geometry_msgs::msg::TransformStamped MsgConverter::broadcastBaseLinkToLidarFrame(const Vector3d& pose) {
+  geometry_msgs::msg::TransformStamped base_link_to_lidar;
+
+  rclcpp::Clock ros_clock(RCL_SYSTEM_TIME);
+  base_link_to_lidar.header.stamp    = ros_clock.now();
+  base_link_to_lidar.header.frame_id = "base_link_";
+  base_link_to_lidar.child_frame_id  = "lidar_frame_";
+
+  // lidar_frame の base_link に対する相対位置と向きを設定
+  base_link_to_lidar.transform.translation.x = pose[0];
+  base_link_to_lidar.transform.translation.y = pose[1];
+  base_link_to_lidar.transform.rotation.z    = sin(pose[2] / 2.0);
+  base_link_to_lidar.transform.rotation.w    = cos(pose[2] / 2.0);
+
+  return base_link_to_lidar;
+}
 
 geometry_msgs::msg::PoseArray MsgConverter::createParticleCloud(std::vector<Mcl2d::Particle> &particles) {
   rclcpp::Clock ros_clock(RCL_SYSTEM_TIME);

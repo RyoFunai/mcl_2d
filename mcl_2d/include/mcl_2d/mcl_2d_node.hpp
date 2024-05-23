@@ -25,16 +25,16 @@ class Mcl2dNode : public rclcpp::Node {
  public:
   Mcl2dNode();
   virtual ~Mcl2dNode() = default;
+  void loop();
+
   int odom_freq_;
 
  private:
   void loadMap(const std::string& yaml_path);
   void laser_callback(const sensor_msgs::msg::LaserScan::SharedPtr msg);
   void initTF();
-  bool getOdomPose(double& x, double& y, double& yaw);
-  bool getLidarPose(double& x, double& y, double& yaw);
-  void publishOdomFrame(double x, double y, double t);
-  void loop();
+  bool getOdomPose(Vector3d& pose);
+  bool getLidarPose(Vector3d& pose);
 
   rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr laser_subscription;
 
@@ -46,16 +46,14 @@ class Mcl2dNode : public rclcpp::Node {
   rclcpp::QoS _qos = rclcpp::QoS(40).keep_all();
 
   std::shared_ptr<tf2_ros::Buffer> tf_;
-  std::shared_ptr<tf2_ros::TransformListener> tfl_;
-  std::shared_ptr<tf2_ros::TransformBroadcaster> tfb_;
+  std::shared_ptr<tf2_ros::TransformListener> tf_listener;
+  std::shared_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster;
   tf2::Transform latest_tf_;
   rclcpp::Clock ros_clock_;
+  sensor_msgs::msg::LaserScan::SharedPtr laser_msg;
   std::string global_frame_id_, footprint_frame_id_, odom_frame_id_, base_frame_id_, scan_frame_id_;
   rclcpp::Time scan_time_stamp_;
   double transform_tolerance_;
-
-  Vector3d odom = Vector3d::Zero();
-  Vector3d laser = Vector3d::Zero();
 
   MsgConverter msg_converter;
   Util util;

@@ -5,5 +5,8 @@
 
 /**:
   ros__parameters:
-    param_name: UAAAAAAAAAAAAAAAAAAAAAAAAAAA!!
-    interval_time: 700
+    global_frame_id: "map"
+    footprint_frame_id: "base_footprint"
+    odom_frame_id: "odom"
+    base_frame_id : "base_link"
+    odom_freq: 10
