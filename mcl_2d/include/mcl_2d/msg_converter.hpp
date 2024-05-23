@@ -9,7 +9,6 @@
 #include <sensor_msgs/msg/point_cloud2.hpp>
 #include <geometry_msgs/msg/transform_stamped.h>
 #include <geometry_msgs/msg/pose_array.hpp>
-#include <tf2_ros/transform_broadcaster.h>
 
 #include "mcl_2d/mcl_2d.hpp"
 #include "mcl_2d/scan.hpp"
@@ -19,8 +18,6 @@ using namespace Eigen;
 
 class MsgConverter {
   public:
-  geometry_msgs::msg::TransformStamped broadcastWorldToBaseLink(const double& x, const double& y, const double& yaw);
-  geometry_msgs::msg::TransformStamped broadcastBaseLinkToLidarFrame(const std::vector<double>& tf_laser2robot);
   geometry_msgs::msg::PoseArray        createParticleCloud(std::vector<Mcl2d::Particle>& particles);
   sensor_msgs::msg::PointCloud2        createTransformedPC2(Eigen::Matrix4Xf& eigenLaser, Eigen::Matrix4f& transMatrix);
 

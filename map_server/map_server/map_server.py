@@ -5,19 +5,6 @@ import yaml
 import numpy as np
 from PIL import Image
 import os
-from pathlib import Path
-
-# class MapServer(Node):
-#   def __init__(self):
-#     super().__init__('map_server')
-#     self.publisher_ = self.create_publisher(OccupancyGrid, 'map', 10)
-#     self.timer = self.create_timer(1, self.publish_map)
-
-#     script_directory = Path(__file__).resolve().parent
-#     map_yaml_path = script_directory / "../../config/maps/iscas_museum_map.yaml"
-#     map_yaml_path = map_yaml_path.resolve()  # Resolve the path to an absolute path
-    
-#     self.map_msg = self.load_map(map_yaml_path)
 
 class MapServer(Node):
   def __init__(self):
