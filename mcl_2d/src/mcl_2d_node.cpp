@@ -13,7 +13,7 @@ Mcl2dNode::Mcl2dNode() : Node("mcl_2d"),
   selfpose_publisher = this->create_publisher<geometry_msgs::msg::Vector3>("self_pose", _qos);
   pc2_mapped_publisher = this->create_publisher<sensor_msgs::msg::PointCloud2>("pc2_mapped", _qos);
   particle_publisher = this->create_publisher<geometry_msgs::msg::PoseArray>("particlecloud", _qos);
-  broadcaster = std::make_shared<tf2_ros::TransformBroadcaster>(*this);
+  broadcaster = std::make_shared<tf2_ros::TransformBroadcaster>(*this);  // shared_from_this()はコンストラクタでは使えない。（オブジェクト化が完了していないから？）
 
   this->declare_parameter("global_frame_id", std::string("map"));
   this->declare_parameter("footprint_frame_id", std::string("base_footprint"));

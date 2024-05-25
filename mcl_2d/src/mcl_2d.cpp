@@ -6,7 +6,6 @@
 
 
 void Mcl2d::loadMap(const std::string& yaml_path) {
-
   std::filesystem::path yaml_file_path = yaml_path;
   YAML::Node config = YAML::LoadFile(yaml_file_path.string());
   std::filesystem::path image_path = yaml_file_path.parent_path() / config["image"].as<std::string>();
@@ -18,7 +17,7 @@ void Mcl2d::loadMap(const std::string& yaml_path) {
 
   cv::Mat map_image = cv::imread(image_path, cv::IMREAD_GRAYSCALE);
   if (map_image.empty()) {
-    RCLCPP_ERROR(node_->get_logger(), "Failed to load map image: %s", image_path.c_str());
+    RCLCPP_ERROR(rclcpp::get_logger("mcl_2d"), "Failed to load map image: %s", image_path.c_str());
     return;
   }
 
@@ -26,7 +25,7 @@ void Mcl2d::loadMap(const std::string& yaml_path) {
   cv::flip(map_image, flipped_map_image, 0);
   imshow("Map", flipped_map_image);
   // cv::waitKey(0);
-  RCLCPP_INFO(node_->get_logger(), "Map loaded successfully: %s", image_path.c_str());
+  RCLCPP_INFO(rclcpp::get_logger("mcl_2d"), "Map loaded successfully: %s", image_path.c_str());
 }
 
 // void mcl::initializeParticles() {
