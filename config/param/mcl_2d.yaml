@@ -10,3 +10,8 @@
     odom_frame_id: "odom"
     base_frame_id : "base_link"
     odom_freq: 10
+    initial_pose:
+      - 0.0  # x
+      - 0.0  # y
+      - 0.0  # yaw
+    particles_num: 100

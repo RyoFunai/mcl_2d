@@ -31,14 +31,16 @@ class Mcl2dNode : public rclcpp::Node {
 
  private:
   void laser_callback(const sensor_msgs::msg::LaserScan::SharedPtr msg);
+
   void initTF();
   bool getOdomPose(Vector3d& pose);
   bool getLidarPose(Vector3d& pose);
+  void publish_particle();
+  
 
   rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr laser_subscription;
 
   std::shared_ptr<tf2_ros::TransformBroadcaster> broadcaster;
-  rclcpp::Publisher<geometry_msgs::msg::Vector3>::SharedPtr selfpose_publisher;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pc2_mapped_publisher;
   rclcpp::Publisher<geometry_msgs::msg::PoseArray>::SharedPtr particle_publisher;
 

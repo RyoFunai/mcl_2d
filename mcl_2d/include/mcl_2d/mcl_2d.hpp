@@ -6,18 +6,28 @@
 #include <cmath>
 #include <rclcpp/rclcpp.hpp>
 
+using namespace Eigen;
+using namespace std;
+
 class Mcl2d
 {
 public:
-  void loadMap(const std::string& yaml_path);
   struct Particle{
     Eigen::Matrix4f pose;
     float score;
-    Eigen::Matrix4Xf scan; // Only for maximum probability particle.
   };
+
+  void loadMap(const string& yaml_path);
+  void init_particles(const Vector3d& initial_pose, const int particles_num);
+  vector<Particle> getParticles() { return particles; };
+
+
+
 
 private:
   cv::Mat gridMap;
   rclcpp::Node::SharedPtr node_;
-
+  vector<Particle> particles;
+  double image_resolution;
+  Vector3d origin_;
 };

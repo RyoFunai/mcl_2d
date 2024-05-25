@@ -6,11 +6,10 @@
 using namespace std;
 
 Mcl2dNode::Mcl2dNode() : Node("mcl_2d"),
-                          ros_clock_(RCL_SYSTEM_TIME) {
+                         ros_clock_(RCL_SYSTEM_TIME) {
   laser_subscription = this->create_subscription<sensor_msgs::msg::LaserScan>(
       "scan", 10, std::bind(&Mcl2dNode::laser_callback, this, std::placeholders::_1));
 
-  selfpose_publisher = this->create_publisher<geometry_msgs::msg::Vector3>("self_pose", _qos);
   pc2_mapped_publisher = this->create_publisher<sensor_msgs::msg::PointCloud2>("pc2_mapped", _qos);
   particle_publisher = this->create_publisher<geometry_msgs::msg::PoseArray>("particlecloud", _qos);
   broadcaster = std::make_shared<tf2_ros::TransformBroadcaster>(*this);  // shared_from_this()はコンストラクタでは使えない。（オブジェクト化が完了していないから？）
@@ -19,21 +18,25 @@ Mcl2dNode::Mcl2dNode() : Node("mcl_2d"),
   this->declare_parameter("footprint_frame_id", std::string("base_footprint"));
   this->declare_parameter("odom_frame_id", std::string("odom"));
   this->declare_parameter("base_frame_id", std::string("base_link"));
-  this->get_parameter("global_frame_id", global_frame_id_);
-  this->get_parameter("footprint_frame_id", footprint_frame_id_);
-  this->get_parameter("odom_frame_id", odom_frame_id_);
-  this->get_parameter("base_frame_id", base_frame_id_);
+  global_frame_id_ = this->get_parameter("global_frame_id").as_string();
+  footprint_frame_id_ = this->get_parameter("footprint_frame_id").as_string();
+  odom_frame_id_ = this->get_parameter("odom_frame_id").as_string();
+  base_frame_id_ = this->get_parameter("base_frame_id").as_string();
 
   this->declare_parameter("odom_freq", 20);
   this->get_parameter("odom_freq", odom_freq_);
-
-
+  this->declare_parameter("initial_pose", std::vector<double>{0.0, 0.0, 0.0});
+  const auto initial_pose_vec = this->get_parameter("initial_pose").as_double_array();
+  this->declare_parameter("particles_num", 100);
+  const auto particles_num_ = this->get_parameter("particles_num").as_int();
   this->declare_parameter("map_param_path", std::string(""));
-  std::string map_param_path_;
-  this->get_parameter("map_param_path", map_param_path_);
+  const auto map_param_path_ = this->get_parameter("map_param_path").as_string();
+
+  Vector3d initial_pose_ = Vector3d::Zero();
+  initial_pose_ << initial_pose_vec[0], initial_pose_vec[1], initial_pose_vec[2];
 
   mcl_2d.loadMap(map_param_path_);
-
+  mcl_2d.init_particles(initial_pose_, particles_num_);
   initTF();
 }
 
@@ -54,6 +57,7 @@ void Mcl2dNode::loop() {
   geometry_msgs::msg::TransformStamped base_link_to_lidar = msg_converter.broadcastBaseLinkToLidarFrame(laser);
   tf_broadcaster->sendTransform(world_to_base_link);
   tf_broadcaster->sendTransform(base_link_to_lidar);
+  publish_particle();
 }
 
 void Mcl2dNode::initTF() {
@@ -117,6 +121,12 @@ bool Mcl2dNode::getLidarPose(Vector3d& pose) {
   pose[2] = tf2::getYaw(lidar_pose.pose.orientation);
 
   return true;
+}
+
+void Mcl2dNode::publish_particle() {
+  std::vector<Mcl2d::Particle> particles = mcl_2d.getParticles();
+  auto pose_array_msg = msg_converter.createParticleCloud(particles);
+  particle_publisher->publish(pose_array_msg);
 }
 
 int main(int argc, char** argv) {

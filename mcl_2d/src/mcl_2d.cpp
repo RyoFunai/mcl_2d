@@ -3,17 +3,20 @@
 #include <yaml-cpp/yaml.h>
 
 #include <filesystem>
+#include <random>
 
+default_random_engine gen;
 
-void Mcl2d::loadMap(const std::string& yaml_path) {
-  std::filesystem::path yaml_file_path = yaml_path;
+void Mcl2d::loadMap(const string& yaml_path) {
+  filesystem::path yaml_file_path = yaml_path;
   YAML::Node config = YAML::LoadFile(yaml_file_path.string());
-  std::filesystem::path image_path = yaml_file_path.parent_path() / config["image"].as<std::string>();
-  double resolution = config["resolution"].as<double>();
-  std::vector<double> origin = config["origin"].as<std::vector<double>>();
-  int negate = config["negate"].as<int>();
-  double occupied_thresh = config["occupied_thresh"].as<double>();
-  double free_thresh = config["free_thresh"].as<double>();
+  filesystem::path image_path = yaml_file_path.parent_path() / config["image"].as<string>();
+  image_resolution = config["resolution"].as<double>();
+  vector<double> origin = config["origin"].as<vector<double>>();
+  origin_ << origin[0], origin[1], origin[2];
+  // int negate = config["negate"].as<int>();
+  // double occupied_thresh = config["occupied_thresh"].as<double>();
+  // double free_thresh = config["free_thresh"].as<double>();
 
   cv::Mat map_image = cv::imread(image_path, cv::IMREAD_GRAYSCALE);
   if (map_image.empty()) {
@@ -23,43 +26,45 @@ void Mcl2d::loadMap(const std::string& yaml_path) {
 
   cv::Mat flipped_map_image;
   cv::flip(map_image, flipped_map_image, 0);
-  imshow("Map", flipped_map_image);
+  // imshow("Map", flipped_map_image);
   // cv::waitKey(0);
+
+  gridMap = flipped_map_image.clone();
   RCLCPP_INFO(rclcpp::get_logger("mcl_2d"), "Map loaded successfully: %s", image_path.c_str());
 }
 
-// void mcl::initializeParticles() {
-//   particles.clear();
+void Mcl2d::init_particles(const Vector3d& initial_pose, const int particles_num) {
+  particles.clear();
 
-//   // Extract initial x, y, and yaw from initial_pose
-//   float initial_x;
-//   float initial_y;
-//   float initial_yaw;
+  // normal_distribution<float> x_pos(initial_pose[0], gridMap.cols * image_resolution / 4.0);
+  // normal_distribution<float> y_pos(initial_pose[1], gridMap.rows * image_resolution / 4.0);
+  // normal_distribution<float> theta_pos(initial_pose[2], M_PI / 4);
 
-//   // Define distributions around the initial pose
-//   std::uniform_real_distribution<float> x_pos(initial_x - gridMapCV.cols * imageResolution / 4.0,
-//                                               initial_x + gridMapCV.cols * imageResolution / 4.0);
-//   std::uniform_real_distribution<float> y_pos(initial_y - gridMapCV.rows * imageResolution / 4.0,
-//                                               initial_y + gridMapCV.rows * imageResolution / 4.0);
-//   std::uniform_real_distribution<float> theta_pos(initial_yaw - M_PI / 4, initial_yaw + M_PI / 4);
+  Vector3d map_initial_pose = initial_pose - origin_;
+  std::normal_distribution<float> x_pos(initial_pose[0], 0.1);  // Standard deviation of 1.0
+  std::normal_distribution<float> y_pos(initial_pose[1], 0.1);  // Standard deviation of 1.0
+  std::normal_distribution<float> theta_pos(initial_pose[2], M_PI / 8);
 
-//   // Set particles by random distribution
-//   for (int i = 0; i < numOfParticle; i++) {
-//     Particle particle_temp;
+  for (int i = 0; i < particles_num; i++) {
+    Particle particle_temp;
 
-//     particle_temp.pose = initial_pose;
-//     particle_temp.pose(0, 3) = x_pos(gen);
-//     particle_temp.pose(1, 3) = y_pos(gen);
-//     particle_temp.pose(2, 3) = 0;
-//     particle_temp.pose.block<3, 3>(0, 0) = Eigen::AngleAxisf(theta_pos(gen), Eigen::Vector3f::UnitZ()).toRotationMatrix();
+    particle_temp.pose = Matrix4f::Identity();
+    particle_temp.pose(0, 3) = x_pos(gen);
+    particle_temp.pose(1, 3) = y_pos(gen);
+    particle_temp.pose(2, 3) = 0;
+    particle_temp.pose.block<3, 3>(0, 0) = AngleAxisf(theta_pos(gen), Vector3f::UnitZ()).toRotationMatrix();
 
-//     particle_temp.score = 1 / (double)numOfParticle;
-//     particles.push_back(particle_temp);
-//   }
-// }
-// int mcl::setup(const int numOfParticle, const float odomCovariance[6], const Eigen::Matrix4f tf_laser2robot, const Eigen::Matrix4f initial_pose) {
+    particle_temp.score = 1 / (double)particles_num;
+    particles.push_back(particle_temp);
+
+    RCLCPP_INFO(rclcpp::get_logger("mcl_2d"), "Particle %d: x=%f, y=%f, yaw=%f, score=%f",
+                i, particle_temp.pose(0, 3), particle_temp.pose(1, 3),
+                std::atan2(particle_temp.pose(1, 0), particle_temp.pose(0, 0)), particle_temp.score);
+  }
+}
+// int Mcl2d::setup(const int particles_num, const float odomCovariance[6], const Matrix4f tf_laser2robot, const Matrix4f initial_pose) {
 //   //--YOU CAN CHANGE THIS PARAMETERS BY YOURSELF--//
-//   this->numOfParticle = numOfParticle;  // Number of Particles.
+//   this->particles_num = particles_num;  // Number of Particles.
 //   minOdomDistance = 0.001;              // [m]
 //   minOdomAngle = 0.1;                   // [deg]
 //   repropagateCountNeeded = 1;           // [num]
@@ -69,12 +74,12 @@ void Mcl2d::loadMap(const std::string& yaml_path) {
 //   }
 
 //   //--DO NOT TOUCH THIS PARAMETERS--//
-//   imageResolution = 0.05;  // [m] per [pixel]
+//   image_resolution = 0.05;  // [m] per [pixel]
 
 //   this->tf_laser2robot = tf_laser2robot;
 //   this->initial_pose = initial_pose;
 
-//   Eigen::VectorXf initial_xyzrpy = tool::eigen2xyzrpy(initial_pose);
+//   VectorXf initial_xyzrpy = tool::eigen2xyzrpy(initial_pose);
 //   x = initial_xyzrpy[0];
 //   y = initial_xyzrpy[1];
 //   angle = initial_xyzrpy[5];
