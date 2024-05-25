@@ -4,10 +4,12 @@
 #include <opencv2/opencv.hpp>
 #include <random>
 #include <cmath>
+#include <rclcpp/rclcpp.hpp>
 
 class Mcl2d
 {
 public:
+  void loadMap(const std::string& yaml_path);
   struct Particle{
     Eigen::Matrix4f pose;
     float score;
@@ -15,4 +17,7 @@ public:
   };
 
 private:
+  cv::Mat gridMap;
+  rclcpp::Node::SharedPtr node_;
+
 };

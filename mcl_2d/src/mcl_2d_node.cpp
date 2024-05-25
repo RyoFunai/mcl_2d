@@ -1,15 +1,12 @@
 #include "mcl_2d/mcl_2d_node.hpp"
 
-#include <yaml-cpp/yaml.h>
-
 #include <cstdio>
-#include <filesystem>
 #include <opencv2/opencv.hpp>
 
 using namespace std;
 
 Mcl2dNode::Mcl2dNode() : Node("mcl_2d"),
-                         ros_clock_(RCL_SYSTEM_TIME) {
+                          ros_clock_(RCL_SYSTEM_TIME) {
   laser_subscription = this->create_subscription<sensor_msgs::msg::LaserScan>(
       "scan", 10, std::bind(&Mcl2dNode::laser_callback, this, std::placeholders::_1));
 
@@ -30,7 +27,12 @@ Mcl2dNode::Mcl2dNode() : Node("mcl_2d"),
   this->declare_parameter("odom_freq", 20);
   this->get_parameter("odom_freq", odom_freq_);
 
-  loadMap("iscas_museum_map.yaml");
+
+  this->declare_parameter("map_param_path", std::string(""));
+  std::string map_param_path_;
+  this->get_parameter("map_param_path", map_param_path_);
+
+  mcl_2d.loadMap(map_param_path_);
 
   initTF();
 }
@@ -52,29 +54,6 @@ void Mcl2dNode::loop() {
   geometry_msgs::msg::TransformStamped base_link_to_lidar = msg_converter.broadcastBaseLinkToLidarFrame(laser);
   tf_broadcaster->sendTransform(world_to_base_link);
   tf_broadcaster->sendTransform(base_link_to_lidar);
-}
-
-void Mcl2dNode::loadMap(const std::string& yaml_path) {
-  std::filesystem::path source_dir = std::filesystem::path(__FILE__).parent_path();
-  std::filesystem::path map_dir = source_dir / "../../config/maps";
-  YAML::Node config = YAML::LoadFile(map_dir.string() + "/" + yaml_path);
-  std::filesystem::path image_path = map_dir / config["image"].as<std::string>();
-  double resolution = config["resolution"].as<double>();
-  std::vector<double> origin = config["origin"].as<std::vector<double>>();
-  int negate = config["negate"].as<int>();
-  double occupied_thresh = config["occupied_thresh"].as<double>();
-  double free_thresh = config["free_thresh"].as<double>();
-
-  cv::Mat map_image = cv::imread(image_path, cv::IMREAD_GRAYSCALE);
-  if (map_image.empty()) {
-    RCLCPP_ERROR(this->get_logger(), "Failed to load map image: %s", image_path.c_str());
-    return;
-  }
-
-  // cv::imshow("Map", map_image);
-  // cv::waitKey(0);  // キー入力を待つ
-
-  RCLCPP_INFO(this->get_logger(), "Map loaded successfully: %s", image_path.c_str());
 }
 
 void Mcl2dNode::initTF() {

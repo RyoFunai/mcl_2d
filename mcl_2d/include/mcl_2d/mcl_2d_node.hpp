@@ -30,7 +30,6 @@ class Mcl2dNode : public rclcpp::Node {
   int odom_freq_;
 
  private:
-  void loadMap(const std::string& yaml_path);
   void laser_callback(const sensor_msgs::msg::LaserScan::SharedPtr msg);
   void initTF();
   bool getOdomPose(Vector3d& pose);
@@ -57,4 +56,5 @@ class Mcl2dNode : public rclcpp::Node {
 
   MsgConverter msg_converter;
   Util util;
+  Mcl2d mcl_2d;
 };

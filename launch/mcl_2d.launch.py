@@ -21,7 +21,7 @@ def generate_launch_description():
     executable='mcl_2d',
     name='mcl_2d',
     output='log',
-    parameters=[mcl_2d_param_path]
+    parameters=[mcl_2d_param_path, {'map_param_path': str(map_param_path)}]
   )
 
   map_server = Node(
@@ -42,7 +42,7 @@ def generate_launch_description():
 
   ld = LaunchDescription()
   ld.add_action(mcl_2d)
-  ld.add_action(map_server)
-  ld.add_action(rviz2)
+  # ld.add_action(map_server)
+  # ld.add_action(rviz2)
 
   return ld
