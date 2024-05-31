@@ -28,32 +28,31 @@ Mcl2dNode::Mcl2dNode() : Node("mcl_2d"),
   this->declare_parameter("initial_pose", std::vector<double>{0.0, 0.0, 0.0});
   const auto initial_pose_vec = this->get_parameter("initial_pose").as_double_array();
   this->declare_parameter("particles_num", 100);
-  const auto particles_num_ = this->get_parameter("particles_num").as_int();
+  particles_num_ = this->get_parameter("particles_num").as_int();
   this->declare_parameter("map_param_path", std::string(""));
   const auto map_param_path_ = this->get_parameter("map_param_path").as_string();
 
-  Vector3d initial_pose_ = Vector3d::Zero();
   initial_pose_ << initial_pose_vec[0], initial_pose_vec[1], initial_pose_vec[2];
 
   mcl_2d.loadMap(map_param_path_);
-  mcl_2d.init_particles(initial_pose_, particles_num_);
   initTF();
 }
 
 void Mcl2dNode::loop() {
-  Vector3d odom = Vector3d::Zero();
-  Vector3d laser = Vector3d::Zero();
+  Vector3f odom = Vector3f::Zero();
+  Vector3f laser = Vector3f::Zero();
   if (!getOdomPose(odom) || !getLidarPose(laser)) {
     RCLCPP_WARN(this->get_logger(), "odom x: %f, y: %f, yaw: %f", odom[0], odom[1], odom[2]);
     RCLCPP_WARN(this->get_logger(), "laser x: %f, y: %f, yaw: %f", laser[0], laser[1], laser[2]);
     return;
   }
-  vector<LaserPoint> src_points = msg_converter.scan_to_vector(laser_msg, laser);
-
+  vector<LaserPoint> src_points = msg_converter.scan_to_vector(laser_msg, odom+laser);
+  Vector3f estimated_pose = mcl_2d.updateData(odom, src_points, particles_num_);
+  RCLCPP_INFO(this->get_logger(), "estimated x: %f, y: %f, yaw: %f", estimated_pose[0], estimated_pose[1], estimated_pose[2]);
   sensor_msgs::msg::PointCloud2 cloud = msg_converter.vector_to_PC2(src_points);
   pc2_mapped_publisher->publish(cloud);
 
-  geometry_msgs::msg::TransformStamped world_to_base_link = msg_converter.broadcastWorldToBaseLink(odom);
+  geometry_msgs::msg::TransformStamped world_to_base_link = msg_converter.broadcastWorldToBaseLink(estimated_pose);
   geometry_msgs::msg::TransformStamped base_link_to_lidar = msg_converter.broadcastBaseLinkToLidarFrame(laser);
   tf_broadcaster->sendTransform(world_to_base_link);
   tf_broadcaster->sendTransform(base_link_to_lidar);
@@ -77,12 +76,11 @@ void Mcl2dNode::initTF() {
 }
 
 void Mcl2dNode::laser_callback(const sensor_msgs::msg::LaserScan::SharedPtr msg) {
-  RCLCPP_INFO(this->get_logger(), "Received scan");
   laser_msg = msg;
   scan_frame_id_ = laser_msg->header.frame_id;
 }
 
-bool Mcl2dNode::getOdomPose(Vector3d& pose) {
+bool Mcl2dNode::getOdomPose(Vector3f& pose) {
   geometry_msgs::msg::PoseStamped ident;
   ident.header.frame_id = footprint_frame_id_;
   ident.header.stamp = rclcpp::Time(0);
@@ -95,14 +93,13 @@ bool Mcl2dNode::getOdomPose(Vector3d& pose) {
     RCLCPP_WARN(get_logger(), "Failed to compute odom pose, skipping scan (%s)", e.what());
     return false;
   }
-  pose[0] = odom_pose.pose.position.x;
-  pose[1] = odom_pose.pose.position.y;
-  pose[2] = tf2::getYaw(odom_pose.pose.orientation);
-
+  pose[0] = odom_pose.pose.position.x + initial_pose_[0];
+  pose[1] = odom_pose.pose.position.y + initial_pose_[1];
+  pose[2] = tf2::getYaw(odom_pose.pose.orientation) + initial_pose_[2];
   return true;
 }
 
-bool Mcl2dNode::getLidarPose(Vector3d& pose) {
+bool Mcl2dNode::getLidarPose(Vector3f& pose) {
   geometry_msgs::msg::PoseStamped ident;
   ident.header.frame_id = scan_frame_id_;
   ident.header.stamp = ros_clock_.now();

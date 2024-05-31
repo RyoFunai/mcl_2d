@@ -33,10 +33,9 @@ class Mcl2dNode : public rclcpp::Node {
   void laser_callback(const sensor_msgs::msg::LaserScan::SharedPtr msg);
 
   void initTF();
-  bool getOdomPose(Vector3d& pose);
-  bool getLidarPose(Vector3d& pose);
+  bool getOdomPose(Vector3f& pose);
+  bool getLidarPose(Vector3f& pose);
   void publish_particle();
-  
 
   rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr laser_subscription;
 
@@ -55,6 +54,8 @@ class Mcl2dNode : public rclcpp::Node {
   std::string global_frame_id_, footprint_frame_id_, odom_frame_id_, base_frame_id_, scan_frame_id_;
   rclcpp::Time scan_time_stamp_;
   double transform_tolerance_;
+  int particles_num_;
+  Vector3f initial_pose_ = Vector3f::Zero();
 
   MsgConverter msg_converter;
   Util util;
