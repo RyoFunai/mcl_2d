@@ -7,33 +7,39 @@
 #include <rclcpp/rclcpp.hpp>
 
 #include "scan.hpp"
-
+  struct Particle {
+    Eigen::Matrix3f pose;
+    float score;
+  };
 using namespace Eigen;
 using namespace std;
 
 class Mcl2d {
  public:
-  struct Particle {
-    Eigen::Matrix4f pose;
-    float score;
-  };
-
   void loadMap(const string& yaml_path);
-  void generate_particles(const Vector3f& initial_pose, const int particles_num);
-  vector<Particle> getParticles() { return particles; };
+  vector<Particle> generate_particles(const Vector3f& initial_pose, const int particles_num);
+  vector<Particle> getParticles() { return particles_temp; };
+  vector<Particle> getResampledParticles() { return resampled_particles; };
   Vector3f updateData(const Vector3f& pose, const vector<LaserPoint>& src_points, const int particles_num);
+  std::vector<LaserPoint> getOverlappingPoints(const Vector3f& position, const std::vector<LaserPoint>& points);
+  void displayLaserPoints(const std::vector<LaserPoint>& points);
 
  private:
-  void likelihood(const vector<LaserPoint>& src_points);
-  Vector3f estimate_current_pose();
-  pair<int, int> mapTopixel(const float& x, const float& y);
+  void likelihood(const vector<LaserPoint>& src_points, vector<Particle>& particles);
+  vector<Particle> systematic_resample(vector<Particle>& particles);
+  Vector3f estimate_current_pose(const vector<Particle>& particles);
+  double normalizeBelief(vector<Particle>& particles);
+
+  pair<int, int> mapToPixel(const float& x, const float& y);
   pair<float, float> pixelToMap(const int& x, const int& y);
   void displayPointOnMap(const float& x, const float& y);
+  static void onMouse(int event, int x, int y, int, void* userdata);
 
   cv::Mat map_image;
   rclcpp::Node::SharedPtr node_;
-  vector<Particle> particles;
   double image_resolution;
   Vector3f map_origin;
   Particle highest_weight_particle;
+  vector<Particle> particles_temp;
+  vector<Particle> resampled_particles;
 };

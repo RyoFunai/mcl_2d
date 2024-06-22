@@ -42,6 +42,7 @@ class Mcl2dNode : public rclcpp::Node {
   std::shared_ptr<tf2_ros::TransformBroadcaster> broadcaster;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pc2_mapped_publisher;
   rclcpp::Publisher<geometry_msgs::msg::PoseArray>::SharedPtr particle_publisher;
+  rclcpp::Publisher<geometry_msgs::msg::PoseArray>::SharedPtr resampled_particle_publisher;
 
   rclcpp::QoS _qos = rclcpp::QoS(40).keep_all();
 
