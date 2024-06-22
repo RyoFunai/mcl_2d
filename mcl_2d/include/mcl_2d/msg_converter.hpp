@@ -19,9 +19,10 @@ using namespace Eigen;
 
 class MsgConverter {
  public:
-  geometry_msgs::msg::PoseArray createParticleCloud(std::vector<Mcl2d::Particle>& particles);
+  geometry_msgs::msg::PoseArray createParticleCloud(std::vector<Particle>& particles);
   sensor_msgs::msg::PointCloud2 createTransformedPC2(Eigen::Matrix4Xf& eigenLaser, Eigen::Matrix4f& transMatrix);
 
+  vector<LaserPoint> scan_to_vector(const sensor_msgs::msg::LaserScan::SharedPtr msg);
   vector<LaserPoint> scan_to_vector(const sensor_msgs::msg::LaserScan::SharedPtr msg, const Vector3f& laser);
   sensor_msgs::msg::PointCloud2 vector_to_PC2(vector<LaserPoint>& points);
   geometry_msgs::msg::TransformStamped broadcastWorldToBaseLink(const Vector3f& pose);

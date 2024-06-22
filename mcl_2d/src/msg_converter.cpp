@@ -12,10 +12,10 @@ geometry_msgs::msg::TransformStamped MsgConverter::broadcastWorldToBaseLink(cons
   world_to_base_link.header.frame_id = "map";
   world_to_base_link.child_frame_id = "base_link_";
   // base_link の絶対位置と向きを設定
-  world_to_base_link.transform.translation.x = pose[0];
-  world_to_base_link.transform.translation.y = pose[1];
-  world_to_base_link.transform.rotation.z = sin(pose[2] / 2.0);
-  world_to_base_link.transform.rotation.w = cos(pose[2] / 2.0);
+  world_to_base_link.transform.translation.x = pose.x();
+  world_to_base_link.transform.translation.y = pose.y();
+  world_to_base_link.transform.rotation.z = sin(pose.z() / 2.0);
+  world_to_base_link.transform.rotation.w = cos(pose.z() / 2.0);
 
   return world_to_base_link;
 }
@@ -29,15 +29,15 @@ geometry_msgs::msg::TransformStamped MsgConverter::broadcastBaseLinkToLidarFrame
   base_link_to_lidar.child_frame_id = "lidar_frame_";
 
   // lidar_frame の base_link に対する相対位置と向きを設定
-  base_link_to_lidar.transform.translation.x = pose[0];
-  base_link_to_lidar.transform.translation.y = pose[1];
-  base_link_to_lidar.transform.rotation.z = sin(pose[2] / 2.0);
-  base_link_to_lidar.transform.rotation.w = cos(pose[2] / 2.0);
+  base_link_to_lidar.transform.translation.x = pose.x();
+  base_link_to_lidar.transform.translation.y = pose.y();
+  base_link_to_lidar.transform.rotation.z = sin(pose.z() / 2.0);
+  base_link_to_lidar.transform.rotation.w = cos(pose.z() / 2.0);
 
   return base_link_to_lidar;
 }
 
-geometry_msgs::msg::PoseArray MsgConverter::createParticleCloud(std::vector<Mcl2d::Particle>& particles) {
+geometry_msgs::msg::PoseArray MsgConverter::createParticleCloud(std::vector<Particle>& particles) {
   rclcpp::Clock ros_clock(RCL_SYSTEM_TIME);
 
   geometry_msgs::msg::PoseArray pose_array_msg;
@@ -47,13 +47,14 @@ geometry_msgs::msg::PoseArray MsgConverter::createParticleCloud(std::vector<Mcl2
   // パーティクルをPoseArrayに追加
   for (const auto& particle : particles) {
     geometry_msgs::msg::Pose pose;
-    pose.position.x = particle.pose(0, 3);
-    pose.position.y = particle.pose(1, 3);
+    pose.position.x = particle.pose(0, 2);
+    pose.position.y = particle.pose(1, 2);
     pose.position.z = 0.0;
 
     // パーティクルの姿勢を四元数に変換
-    Eigen::Matrix3f rotation = particle.pose.block<3, 3>(0, 0);
-    Eigen::Quaternionf q(rotation);
+    Eigen::Matrix2f rotation = particle.pose.block<2, 2>(0, 0);
+    Eigen::Rotation2Df rot2d(rotation);                                                // 2D回転行列から回転角度を取得
+    Eigen::Quaternionf q(Eigen::AngleAxisf(rot2d.angle(), Eigen::Vector3f::UnitZ()));  // Z軸周りの回転として四元数を作成
     pose.orientation.x = q.x();
     pose.orientation.y = q.y();
     pose.orientation.z = q.z();
@@ -97,6 +98,18 @@ sensor_msgs::msg::PointCloud2 MsgConverter::createTransformedPC2(Eigen::Matrix4X
   }
 
   return cloud_msg;
+}
+
+vector<LaserPoint> MsgConverter::scan_to_vector(const sensor_msgs::msg::LaserScan::SharedPtr msg) {
+  vector<LaserPoint> src_points;
+  for (size_t i = 0; i < msg->ranges.size(); ++i) {
+    LaserPoint src_point;
+    if (msg->ranges[i] > 12 || msg->ranges[i] < 0.5) continue;
+    src_point.x = msg->ranges[i] * cos(msg->angle_min + msg->angle_increment * i);  // 極座標
+    src_point.y = msg->ranges[i] * sin(msg->angle_min + msg->angle_increment * i);
+    src_points.push_back(src_point);
+  }
+  return src_points;
 }
 
 vector<LaserPoint> MsgConverter::scan_to_vector(const sensor_msgs::msg::LaserScan::SharedPtr msg, const Vector3f& laser) {

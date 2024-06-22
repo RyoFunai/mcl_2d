@@ -21,3 +21,18 @@ double Util::quaternionToYaw(const double& w, const double& x, const double& y, 
     return yaw;
 }
 
+std::vector<LaserPoint> Util::transformToMapCoordinates(const std::vector<LaserPoint>& src_points, const Vector3f& pose) {
+  std::vector<LaserPoint> map_points;
+  Eigen::Rotation2Df rotation(pose.z());  // Z軸周りの回転行列を生成
+  Eigen::Matrix2f rotation_matrix = rotation.toRotationMatrix();
+
+  for (const auto& point : src_points) {
+    Eigen::Vector2f laser_point(point.x, point.y);  // 2次元に変更
+    Eigen::Vector2f rotated_point = rotation_matrix * laser_point;  // 回転を適用
+    LaserPoint map_point;
+    map_point.x = rotated_point.x() + pose.x();
+    map_point.y = rotated_point.y() + pose.y();
+    map_points.push_back(map_point);
+  }
+  return map_points;
+}
