@@ -7,26 +7,28 @@
 #include <rclcpp/rclcpp.hpp>
 
 #include "scan.hpp"
-  struct Particle {
-    Eigen::Matrix3f pose;
-    float score;
-  };
+struct Particle {
+  Eigen::Matrix3f pose;
+  float score;
+};
 using namespace Eigen;
 using namespace std;
 
 class Mcl2d {
  public:
-  void loadMap(const string& yaml_path);
-  vector<Particle> generate_particles(const Vector3f& initial_pose, const int particles_num);
-  vector<Particle> getParticles() { return particles_temp; };
-  vector<Particle> getResampledParticles() { return resampled_particles; };
+  void setup(const string& yaml_path, const vector<double>& odom_convariance);
+  vector<Particle> getParticles() { return particles; };
+  // vector<Particle> getResampledParticles() { return resampled_particles; };
   Vector3f updateData(const Vector3f& pose, const vector<LaserPoint>& src_points, const int particles_num);
   std::vector<LaserPoint> getOverlappingPoints(const Vector3f& position, const std::vector<LaserPoint>& points);
   void displayLaserPoints(const std::vector<LaserPoint>& points);
 
  private:
+  void loadMap(const string& yaml_path);
   void likelihood(const vector<LaserPoint>& src_points, vector<Particle>& particles);
-  vector<Particle> systematic_resample(vector<Particle>& particles);
+  vector<Particle> generate_particles_normal(const Vector3f& initial_pose, const int particles_num);
+  void sampling(Vector3f& diffPose, vector<Particle>& particles);
+  void systematic_resample(vector<Particle>& particles);
   Vector3f estimate_current_pose(const vector<Particle>& particles);
   double normalizeBelief(vector<Particle>& particles);
 
@@ -39,7 +41,10 @@ class Mcl2d {
   rclcpp::Node::SharedPtr node_;
   double image_resolution;
   Vector3f map_origin;
+  Vector3f pre_pose = Vector3f::Zero();
+  Vector3f diff_pose = Vector3f::Zero();
   Particle highest_weight_particle;
-  vector<Particle> particles_temp;
-  vector<Particle> resampled_particles;
+  bool is_first_time{true};
+  vector<double> odom_convariance_;
+  vector<Particle> particles;
 };

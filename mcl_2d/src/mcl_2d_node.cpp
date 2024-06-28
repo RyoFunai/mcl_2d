@@ -31,11 +31,13 @@ Mcl2dNode::Mcl2dNode() : Node("mcl_2d"),
   this->declare_parameter("particles_num", 100);
   particles_num_ = this->get_parameter("particles_num").as_int();
   this->declare_parameter("map_param_path", std::string(""));
-  const auto map_param_path_ = this->get_parameter("map_param_path").as_string();
+  const auto map_param_path = this->get_parameter("map_param_path").as_string();
+  this->declare_parameter("odom_convariance", std::vector<double>{0.0, 0.0, 0.0, 0.0});
+  const auto odom_convariance = this->get_parameter("odom_convariance").as_double_array();
 
   initial_pose_ << initial_pose_vec[0], initial_pose_vec[1], initial_pose_vec[2];
 
-  mcl_2d.loadMap(map_param_path_);
+  mcl_2d.setup(map_param_path, odom_convariance);
   initTF();
 }
 
@@ -127,9 +129,9 @@ void Mcl2dNode::publish_particle() {
   auto pose_array_msg = msg_converter.createParticleCloud(particles);
   particle_publisher->publish(pose_array_msg);
 
-  std::vector<Particle> resampled_particles = mcl_2d.getResampledParticles();
-  auto resampled_pose_array_msg = msg_converter.createParticleCloud(resampled_particles);
-  resampled_particle_publisher->publish(resampled_pose_array_msg);
+  // std::vector<Particle> resampled_particles = mcl_2d.getResampledParticles();
+  // auto resampled_pose_array_msg = msg_converter.createParticleCloud(resampled_particles);
+  // resampled_particle_publisher->publish(resampled_pose_array_msg);
 }
 
 int main(int argc, char** argv) {

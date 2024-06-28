@@ -8,6 +8,11 @@
 
 default_random_engine gen;
 
+void Mcl2d::setup(const string& yaml_path, const vector<double>& odom_convariance) {
+  odom_convariance_ = odom_convariance;
+  loadMap(yaml_path);
+}
+
 void Mcl2d::loadMap(const string& yaml_path) {
   filesystem::path yaml_file_path = yaml_path;
   YAML::Node config = YAML::LoadFile(yaml_file_path.string());
@@ -22,7 +27,7 @@ void Mcl2d::loadMap(const string& yaml_path) {
   map_image = cv::imread(image_path, cv::IMREAD_GRAYSCALE);
   if (map_image.empty()) {
     RCLCPP_ERROR(rclcpp::get_logger("mcl_2d"), "Failed to load map image: %s", image_path.c_str());
-    return;
+    exit(0);
   }
 
   cv::flip(map_image, map_image, 0);
@@ -42,28 +47,33 @@ void Mcl2d::loadMap(const string& yaml_path) {
 }
 
 Vector3f Mcl2d::updateData(const Vector3f& pose, const vector<LaserPoint>& src_points, const int particles_num) {
+  diff_pose = pose - pre_pose;
   auto start = std::chrono::high_resolution_clock::now();  // 計測開始
-
   RCLCPP_INFO(rclcpp::get_logger("mcl_2d"), "Updating data...");
-
-  particles_temp.clear();
-  resampled_particles.clear();
-
-  particles_temp = generate_particles(pose, particles_num);
-  likelihood(src_points, particles_temp);
-  if (normalizeBelief(particles_temp) > 0.000001) {
-    resampled_particles = systematic_resample(particles_temp);
+  if (is_first_time) {
+    particles = generate_particles_normal(pose, particles_num);
+    is_first_time = false;
+  } else {
+    sampling(diff_pose, particles);
+  }
+  likelihood(src_points, particles);
+  if (normalizeBelief(particles) > 1.0E-6) {
+    systematic_resample(particles);
   } else {
     // resetWeight();
-    RCLCPP_INFO(rclcpp::get_logger("mcl_2d"), "No particle with positive score");
+    RCLCPP_WARN(rclcpp::get_logger("mcl_2d"), "No particle with positive score");
   }
-  Vector3f current_pose = estimate_current_pose(particles_temp);
+  Vector3f current_pose = estimate_current_pose(particles);
 
   RCLCPP_INFO(rclcpp::get_logger("mcl_2d"), "updateData function took %lld ms", std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).count());
+
+  pre_pose = current_pose;
+
+  is_first_time = false;
   return current_pose;
 }
 
-vector<Particle> Mcl2d::generate_particles(const Vector3f& pose, const int particles_num) {
+vector<Particle> Mcl2d::generate_particles_normal(const Vector3f& pose, const int particles_num) {
   vector<Particle> particles;
 
   std::normal_distribution<float> x_pos(pose.x(), 0.2);
@@ -82,6 +92,49 @@ vector<Particle> Mcl2d::generate_particles(const Vector3f& pose, const int parti
     particles.push_back(particle_temp);
   }
   return particles;
+}
+
+void Mcl2d::sampling(Vector3f& diffPose, vector<Particle>& particles) {
+  double delta_length = sqrt(pow(diffPose.x(), 2) + pow(diffPose.y(), 2));
+  double delta_rot1 = atan2(diffPose.y(), diffPose.x());
+  double delta_rot2 = diffPose.z() - delta_rot1;
+
+  RCLCPP_INFO(rclcpp::get_logger("mcl_2d"), "diffPose: %f, %f, %f", diffPose.x(), diffPose.y(), diffPose.z()*180/M_PI);
+  RCLCPP_INFO(rclcpp::get_logger("mcl_2d"), "delta_length: %f, delta_rot1: %f, delta_rot2: %f", delta_length, delta_rot1 * 180 / M_PI, delta_rot2 * 180 / M_PI);
+
+  std::default_random_engine generator;
+  if (delta_rot1 > M_PI)
+    delta_rot1 -= (2 * M_PI);
+  if (delta_rot1 < -M_PI)
+    delta_rot1 += (2 * M_PI);
+  if (delta_rot2 > M_PI)
+    delta_rot2 -= (2 * M_PI);
+  if (delta_rot2 < -M_PI)
+    delta_rot2 += (2 * M_PI);
+  //// Add noises to trans/rot1/rot2
+  double trans_noise_coeff = odom_convariance_[2] * fabs(delta_length) + odom_convariance_[3] * fabs(delta_rot1 + delta_rot2);
+  double rot1_noise_coeff = odom_convariance_[0] * fabs(delta_rot1) + odom_convariance_[1] * fabs(delta_length);
+  double rot2_noise_coeff = odom_convariance_[0] * fabs(delta_rot2) + odom_convariance_[1] * fabs(delta_length);
+
+  float scoreSum = 0;
+  for (int i = 0; i < particles.size(); i++) {
+    std::normal_distribution<double> gaussian_distribution(0, 1);
+
+    delta_length = delta_length + gaussian_distribution(gen) * trans_noise_coeff;
+    delta_rot1 = delta_rot1 + gaussian_distribution(gen) * rot1_noise_coeff;
+    delta_rot2 = delta_rot2 + gaussian_distribution(gen) * rot2_noise_coeff;
+
+    double x = delta_length * cos(delta_rot1) + gaussian_distribution(gen) * odom_convariance_[4];
+    double y = delta_length * sin(delta_rot1) + gaussian_distribution(gen) * odom_convariance_[5];
+    double theta = delta_rot1 + delta_rot2 + gaussian_distribution(gen) * odom_convariance_[0] * (M_PI / 180.0);
+
+    Eigen::Matrix3f diff_odom_w_noise = Eigen::Matrix3f::Identity();
+    diff_odom_w_noise(0, 2) = x;
+    diff_odom_w_noise(1, 2) = y;
+    diff_odom_w_noise.block<2, 2>(0, 0) = Eigen::Rotation2Df(theta).toRotationMatrix();
+
+    particles.at(i).pose = particles.at(i).pose * diff_odom_w_noise;
+  }
 }
 
 void Mcl2d::likelihood(const vector<LaserPoint>& src_points, vector<Particle>& particles) {
@@ -109,15 +162,17 @@ void Mcl2d::likelihood(const vector<LaserPoint>& src_points, vector<Particle>& p
   }
 }
 
-vector<Particle> Mcl2d::systematic_resample(vector<Particle>& particles) {
-  float step = 1 / particles.size();
+void Mcl2d::systematic_resample(vector<Particle>& particles) {
+  float step = 1.0f / particles.size();
 
   std::uniform_real_distribution<float> dist(0.0, step);
   float random_start_point = dist(gen);
 
   float cumulative_sum = particles[0].score;
   int count = 0;
-  std::vector<Particle> new_particles;
+  vector<Particle> new_particles;
+  new_particles.reserve(particles.size());  // 事前にメモリを確保
+
   for (int i = 0; i < particles.size(); ++i) {
     float sampling_point = random_start_point + i * step;
     while (sampling_point > cumulative_sum) {
@@ -126,6 +181,8 @@ vector<Particle> Mcl2d::systematic_resample(vector<Particle>& particles) {
     }
     new_particles.push_back(particles[count]);
   }
+
+  particles = std::move(new_particles);  // 新しいパーティクルを元のベクトルに反映
 }
 
 double Mcl2d::normalizeBelief(vector<Particle>& particles) {
@@ -134,7 +191,7 @@ double Mcl2d::normalizeBelief(vector<Particle>& particles) {
     sum += p.score;
   }
 
-  if (sum < 0.000000000001) {
+  if (sum < 1.0E-12) {
     return sum;
   }
 
