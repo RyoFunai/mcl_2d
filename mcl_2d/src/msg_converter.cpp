@@ -3,6 +3,8 @@
 #include <tf2/LinearMath/Quaternion.h>
 
 #include <geometry_msgs/msg/pose_array.hpp>
+#include <std_msgs/msg/color_rgba.hpp>
+
 
 geometry_msgs::msg::TransformStamped MsgConverter::broadcastWorldToBaseLink(const Vector3f& pose) {
   geometry_msgs::msg::TransformStamped world_to_base_link;
@@ -37,32 +39,103 @@ geometry_msgs::msg::TransformStamped MsgConverter::broadcastBaseLinkToLidarFrame
   return base_link_to_lidar;
 }
 
-geometry_msgs::msg::PoseArray MsgConverter::createParticleCloud(std::vector<Particle>& particles) {
+// geometry_msgs::msg::PoseArray MsgConverter::createParticleCloud(const std::vector<Particle>& particles) {
+//   rclcpp::Clock ros_clock(RCL_SYSTEM_TIME); 
+
+//   geometry_msgs::msg::PoseArray pose_array_msg;
+//   pose_array_msg.header.stamp = ros_clock.now();
+//   pose_array_msg.header.frame_id = "map";
+
+//   // パーティクルをPoseArrayに追加
+//   for (const auto& particle : particles) {
+//     geometry_msgs::msg::Pose pose;
+//     pose.position.x = particle.pose(0, 2);
+//     pose.position.y = particle.pose(1, 2);
+//     pose.position.z = 0.0;
+
+//     // パーティクルの姿勢を四元数に変換
+//     Eigen::Matrix2f rotation = particle.pose.block<2, 2>(0, 0);
+//     Eigen::Rotation2Df rot2d(rotation);                                                // 2D回転行列から回転角度を取得
+//     Eigen::Quaternionf q(Eigen::AngleAxisf(rot2d.angle(), Eigen::Vector3f::UnitZ()));  // Z軸周りの回転として四元数を作成
+//     pose.orientation.x = q.x();
+//     pose.orientation.y = q.y();
+//     pose.orientation.z = q.z();
+//     pose.orientation.w = q.w();
+//     pose_array_msg.poses.push_back(pose);
+//   }
+
+//   return pose_array_msg;
+// }
+
+
+
+visualization_msgs::msg::MarkerArray MsgConverter::createParticleCloudMarkerArray(const std::vector<Particle>& particles) {
   rclcpp::Clock ros_clock(RCL_SYSTEM_TIME);
 
-  geometry_msgs::msg::PoseArray pose_array_msg;
-  pose_array_msg.header.stamp = ros_clock.now();
-  pose_array_msg.header.frame_id = "map";
+  visualization_msgs::msg::MarkerArray marker_array_msg;
 
-  // パーティクルをPoseArrayに追加
+  // パーティクルの最大スコアと最小スコアを見つける
+  float max_score = std::numeric_limits<float>::lowest();
+  float min_score = std::numeric_limits<float>::max();
   for (const auto& particle : particles) {
-    geometry_msgs::msg::Pose pose;
-    pose.position.x = particle.pose(0, 2);
-    pose.position.y = particle.pose(1, 2);
-    pose.position.z = 0.0;
-
-    // パーティクルの姿勢を四元数に変換
-    Eigen::Matrix2f rotation = particle.pose.block<2, 2>(0, 0);
-    Eigen::Rotation2Df rot2d(rotation);                                                // 2D回転行列から回転角度を取得
-    Eigen::Quaternionf q(Eigen::AngleAxisf(rot2d.angle(), Eigen::Vector3f::UnitZ()));  // Z軸周りの回転として四元数を作成
-    pose.orientation.x = q.x();
-    pose.orientation.y = q.y();
-    pose.orientation.z = q.z();
-    pose.orientation.w = q.w();
-    pose_array_msg.poses.push_back(pose);
+    max_score = std::max(max_score, particle.score);
+    min_score = std::min(min_score, particle.score);
   }
 
-  return pose_array_msg;
+  // パーティクルの最大スコアを見つける
+  for (const auto& particle : particles) {
+    if (particle.score > max_score) {
+      max_score = particle.score;
+    }
+  }
+  float score_range = max_score - min_score;
+
+
+  // パーティクルをMarkerArrayに追加
+  for (size_t i = 0; i < particles.size(); ++i) {
+    const auto& particle = particles[i];
+    visualization_msgs::msg::Marker marker;
+    marker.header.frame_id = "map";
+    marker.header.stamp = ros_clock.now();
+    marker.ns = "particles";
+    marker.id = i;
+    marker.type = visualization_msgs::msg::Marker::ARROW;
+    marker.action = visualization_msgs::msg::Marker::ADD;
+
+    marker.pose.position.x = particle.pose(0, 2);
+    marker.pose.position.y = particle.pose(1, 2);
+    marker.pose.position.z = 0.0;
+
+    Eigen::Matrix2f rotation = particle.pose.block<2, 2>(0, 0);
+    Eigen::Rotation2Df rot2d(rotation);
+    Eigen::Quaternionf q(Eigen::AngleAxisf(rot2d.angle(), Eigen::Vector3f::UnitZ()));
+    marker.pose.orientation.x = q.x();
+    marker.pose.orientation.y = q.y();
+    marker.pose.orientation.z = q.z();
+    marker.pose.orientation.w = q.w();
+
+    marker.scale.x = 0.2;  // 矢印の長さ
+    marker.scale.y = 0.05; // 矢印の幅
+    marker.scale.z = 0.05; // 矢印の高さ
+
+    // float normalized_score = particle.score / max_score;
+    float normalized_score;
+    if (score_range > 0) {
+      normalized_score = (particle.score - min_score) / score_range;
+    } else {
+      // すべてのスコアが同じ場合
+      normalized_score = 1.0;
+    }
+
+    marker.color.r = normalized_score;
+    marker.color.g = 1.0f - normalized_score;
+    marker.color.b = 0.0;
+    marker.color.a = 1.0;
+
+    marker_array_msg.markers.push_back(marker);
+  }
+
+  return marker_array_msg;
 }
 
 sensor_msgs::msg::PointCloud2 MsgConverter::createTransformedPC2(Eigen::Matrix4Xf& eigenLaser, Eigen::Matrix4f& transMatrix) {

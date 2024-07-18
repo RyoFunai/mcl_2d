@@ -9,6 +9,7 @@
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/laser_scan.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
+#include <visualization_msgs/msg/marker_array.hpp>
 #include <vector>
 
 #include "mcl_2d/mcl_2d.hpp"
@@ -19,7 +20,8 @@ using namespace Eigen;
 
 class MsgConverter {
  public:
-  geometry_msgs::msg::PoseArray createParticleCloud(std::vector<Particle>& particles);
+  visualization_msgs::msg::MarkerArray createParticleCloudMarkerArray(const std::vector<Particle>& particles);
+  geometry_msgs::msg::PoseArray createParticleCloud(const std::vector<Particle>& particles);
   sensor_msgs::msg::PointCloud2 createTransformedPC2(Eigen::Matrix4Xf& eigenLaser, Eigen::Matrix4f& transMatrix);
 
   vector<LaserPoint> scan_to_vector(const sensor_msgs::msg::LaserScan::SharedPtr msg);
