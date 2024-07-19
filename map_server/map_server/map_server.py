@@ -21,15 +21,13 @@ class MapServer(Node):
     with open(map_yaml_path, 'r') as file:
         map_data = yaml.safe_load(file)
     yaml_directory = os.path.dirname(map_yaml_path)
-    map_image_path = os.path.join(yaml_directory, map_data['image'])
+    map_image_path = os.path.join(yaml_directory, map_data['likelihood_image'])
     image = Image.open(map_image_path)
     image = image.transpose(Image.FLIP_TOP_BOTTOM)  # 画像と地図の座標系が違うためy軸方向を反転
     map_image = np.array(image)
     
-    occupancy_grid_data = np.zeros_like(map_image, dtype=int)
-    occupancy_grid_data[map_image == 255] = 0  # Free space
-    occupancy_grid_data[map_image == 0] = 100  # Occupied space
-    occupancy_grid_data[map_image == 205] = -1 # Unknown space
+    # 尤度マップの値をOccupancyGridの範囲（0-100）に変換
+    occupancy_grid_data = np.interp(map_image, [0, 255], [100, 0]).astype(int)
 
     map_msg = OccupancyGrid()
     map_msg.header.frame_id = "map"
