@@ -17,6 +17,7 @@
 #include <sensor_msgs/msg/laser_scan.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
+#include <visualization_msgs/msg/marker_array.hpp>
 
 #include "mcl_2d/msg_converter.hpp"
 #include "mcl_2d/util.hpp"
@@ -41,6 +42,7 @@ class Mcl2dNode : public rclcpp::Node {
 
   std::shared_ptr<tf2_ros::TransformBroadcaster> broadcaster;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pc2_mapped_publisher;
+  rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr particle_marker_publisher;
   rclcpp::Publisher<geometry_msgs::msg::PoseArray>::SharedPtr particle_publisher;
   rclcpp::Publisher<geometry_msgs::msg::PoseArray>::SharedPtr resampled_particle_publisher;
 
@@ -56,7 +58,11 @@ class Mcl2dNode : public rclcpp::Node {
   rclcpp::Time scan_time_stamp_;
   double transform_tolerance_;
   int particles_num_;
+
   Vector3f initial_pose_ = Vector3f::Zero();
+  Vector3f last_odom_ = Vector3f::Zero();
+  Vector3f estimated_pose_ = Vector3f::Zero();
+  bool first_measurement_ = true;
 
   MsgConverter msg_converter;
   Util util;

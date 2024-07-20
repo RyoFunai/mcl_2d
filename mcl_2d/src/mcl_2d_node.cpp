@@ -11,6 +11,7 @@ Mcl2dNode::Mcl2dNode() : Node("mcl_2d"),
       "scan", 10, std::bind(&Mcl2dNode::laser_callback, this, std::placeholders::_1));
 
   pc2_mapped_publisher = this->create_publisher<sensor_msgs::msg::PointCloud2>("pc2_mapped", _qos);
+  particle_marker_publisher = this->create_publisher<visualization_msgs::msg::MarkerArray>("particle_cloud", _qos);
   particle_publisher = this->create_publisher<geometry_msgs::msg::PoseArray>("particlecloud", _qos);
   resampled_particle_publisher = this->create_publisher<geometry_msgs::msg::PoseArray>("resampled_particlecloud", _qos);
   broadcaster = std::make_shared<tf2_ros::TransformBroadcaster>(*this);  // shared_from_this()はコンストラクタでは使えない。（オブジェクト化が完了していないから？）
@@ -37,26 +38,41 @@ Mcl2dNode::Mcl2dNode() : Node("mcl_2d"),
 
   initial_pose_ << initial_pose_vec[0], initial_pose_vec[1], initial_pose_vec[2];
 
+  estimated_pose_ = initial_pose_;
+
   mcl_2d.setup(map_param_path, odom_convariance);
   initTF();
 }
 
 void Mcl2dNode::loop() {
-  Vector3f odom = Vector3f::Zero();
+  Vector3f current_odom = Vector3f::Zero();
   Vector3f laser = Vector3f::Zero();
-  if (!getOdomPose(odom) || !getLidarPose(laser)) {
-    RCLCPP_WARN(this->get_logger(), "odom x: %f, y: %f, yaw: %f", odom.x(), odom.y(), odom.z());
-    RCLCPP_WARN(this->get_logger(), "laser x: %f, y: %f, yaw: %f", laser.x(), laser.y(), laser.z());
+  if (!getOdomPose(current_odom) || !getLidarPose(laser)) {
+    RCLCPP_WARN(this->get_logger(), "Failed to get odom or lidar pose");
     return;
   }
+
+  if (first_measurement_) {
+    last_odom_ = current_odom;
+    first_measurement_ = false;
+    return;
+  }
+
+  // オドメトリの差分を計算
+  Vector3f odom_delta = current_odom - last_odom_;
+  last_odom_ = current_odom;
+
+  // 前回の推定値にオドメトリの差分を適用
+  Vector3f predicted_pose = estimated_pose_ + odom_delta;
+
   vector<LaserPoint> src_points = msg_converter.scan_to_vector(laser_msg);
-  Vector3f estimated_pose = mcl_2d.updateData(odom, src_points, particles_num_);
-  // vector<LaserPoint> overlapping_points = mcl_2d.getOverlappingPoints(odom, src_points);
-  vector<LaserPoint> map_points = util.transformToMapCoordinates(src_points, odom + laser);
+  estimated_pose_ = mcl_2d.updateData(predicted_pose, src_points, particles_num_);
+  // vector<LaserPoint> overlapping_points = mcl_2d.getOverlappingPoints(current_odom, src_points);
+  vector<LaserPoint> map_points = util.transformToMapCoordinates(src_points, estimated_pose_);
   sensor_msgs::msg::PointCloud2 cloud = msg_converter.vector_to_PC2(map_points);
   // mcl_2d.displayLaserPoints(src_points);
   pc2_mapped_publisher->publish(cloud);
-  geometry_msgs::msg::TransformStamped world_to_base_link = msg_converter.broadcastWorldToBaseLink(estimated_pose);
+  geometry_msgs::msg::TransformStamped world_to_base_link = msg_converter.broadcastWorldToBaseLink(estimated_pose_);
   geometry_msgs::msg::TransformStamped base_link_to_lidar = msg_converter.broadcastBaseLinkToLidarFrame(laser);
   tf_broadcaster->sendTransform(world_to_base_link);
   tf_broadcaster->sendTransform(base_link_to_lidar);
@@ -125,9 +141,16 @@ bool Mcl2dNode::getLidarPose(Vector3f& pose) {
 }
 
 void Mcl2dNode::publish_particle() {
+  auto marker_array = msg_converter.createParticleCloudMarkerArray(mcl_2d.getParticles());
+  particle_marker_publisher->publish(marker_array);
+
+
   std::vector<Particle> particles = mcl_2d.getParticles();
-  auto pose_array_msg = msg_converter.createParticleCloud(particles);
-  particle_publisher->publish(pose_array_msg);
+  for (int i = 0; i < particles.size(); i++) {
+    // RCLCPP_INFO(get_logger(), "particle score: %f", particles[i].score);
+  }
+  // auto pose_array_msg = msg_converter.createParticleCloud(particles);
+  // particle_publisher->publish(pose_array_msg);
 
   // std::vector<Particle> resampled_particles = mcl_2d.getResampledParticles();
   // auto resampled_pose_array_msg = msg_converter.createParticleCloud(resampled_particles);
