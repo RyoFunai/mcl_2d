@@ -1,5 +1,7 @@
 #pragma once
 
+#include "mcl_2d/visibility_control.hpp"
+
 #include <geometry_msgs/msg/transform_stamped.h>
 #include <tf2_ros/transform_broadcaster.h>
 
@@ -18,7 +20,7 @@
 using namespace std;
 using namespace Eigen;
 
-class MsgConverter {
+class MCL2D_CORE_EXPORT MsgConverter {
  public:
   visualization_msgs::msg::MarkerArray createParticleCloudMarkerArray(const std::vector<Particle>& particles);
   geometry_msgs::msg::PoseArray createParticleCloud(const std::vector<Particle>& particles);

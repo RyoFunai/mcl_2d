@@ -1,5 +1,7 @@
 #pragma once
 
+#include "mcl_2d/visibility_control.hpp"
+
 #include <cmath>
 #include <eigen3/Eigen/Dense>
 #include <opencv2/opencv.hpp>
@@ -17,7 +19,7 @@ struct Particle {
 using namespace Eigen;
 using namespace std;
 
-class Mcl2d {
+class MCL2D_CORE_EXPORT Mcl2d {
  public:
   void setup(const string& yaml_path, const vector<double>& odom_convariance);
   vector<Particle> getParticles() { return particles; };
@@ -25,6 +27,7 @@ class Mcl2d {
   Vector3f updateData(const Vector3f& pose, const vector<LaserPoint>& src_points, const int particles_num);
   std::vector<LaserPoint> getOverlappingPoints(const Vector3f& position, const std::vector<LaserPoint>& points);
   void displayLaserPoints(const std::vector<LaserPoint>& points);
+  Vector3f estimate_current_pose(const vector<Particle>& particles);
 
  private:
   void loadMap(const string& yaml_path);
@@ -35,7 +38,6 @@ class Mcl2d {
   double generateGaussianNoise(double mean, double stddev);
   void simple_resample(vector<Particle>& particles);
   void systematic_resample(vector<Particle>& particles);
-  Vector3f estimate_current_pose(const vector<Particle>& particles);
   double normalizeBelief(vector<Particle>& particles);
 
   pair<int, int> mapToPixel(const float& x, const float& y);
