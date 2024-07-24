@@ -39,33 +39,33 @@ geometry_msgs::msg::TransformStamped MsgConverter::broadcastBaseLinkToLidarFrame
   return base_link_to_lidar;
 }
 
-// geometry_msgs::msg::PoseArray MsgConverter::createParticleCloud(const std::vector<Particle>& particles) {
-//   rclcpp::Clock ros_clock(RCL_SYSTEM_TIME); 
+geometry_msgs::msg::PoseArray MsgConverter::createParticleCloud(const std::vector<Particle>& particles) {
+  rclcpp::Clock ros_clock(RCL_SYSTEM_TIME); 
 
-//   geometry_msgs::msg::PoseArray pose_array_msg;
-//   pose_array_msg.header.stamp = ros_clock.now();
-//   pose_array_msg.header.frame_id = "map";
+  geometry_msgs::msg::PoseArray pose_array_msg;
+  pose_array_msg.header.stamp = ros_clock.now();
+  pose_array_msg.header.frame_id = "map";
 
-//   // パーティクルをPoseArrayに追加
-//   for (const auto& particle : particles) {
-//     geometry_msgs::msg::Pose pose;
-//     pose.position.x = particle.pose(0, 2);
-//     pose.position.y = particle.pose(1, 2);
-//     pose.position.z = 0.0;
+  // パーティクルをPoseArrayに追加
+  for (const auto& particle : particles) {
+    geometry_msgs::msg::Pose pose;
+    pose.position.x = particle.pose(0, 2);
+    pose.position.y = particle.pose(1, 2);
+    pose.position.z = 0.0;
 
-//     // パーティクルの姿勢を四元数に変換
-//     Eigen::Matrix2f rotation = particle.pose.block<2, 2>(0, 0);
-//     Eigen::Rotation2Df rot2d(rotation);                                                // 2D回転行列から回転角度を取得
-//     Eigen::Quaternionf q(Eigen::AngleAxisf(rot2d.angle(), Eigen::Vector3f::UnitZ()));  // Z軸周りの回転として四元数を作成
-//     pose.orientation.x = q.x();
-//     pose.orientation.y = q.y();
-//     pose.orientation.z = q.z();
-//     pose.orientation.w = q.w();
-//     pose_array_msg.poses.push_back(pose);
-//   }
+    // パーティクルの姿勢を四元数に変換
+    Eigen::Matrix2f rotation = particle.pose.block<2, 2>(0, 0);
+    Eigen::Rotation2Df rot2d(rotation);                                                // 2D回転行列から回転角度を取得
+    Eigen::Quaternionf q(Eigen::AngleAxisf(rot2d.angle(), Eigen::Vector3f::UnitZ()));  // Z軸周りの回転として四元数を作成
+    pose.orientation.x = q.x();
+    pose.orientation.y = q.y();
+    pose.orientation.z = q.z();
+    pose.orientation.w = q.w();
+    pose_array_msg.poses.push_back(pose);
+  }
 
-//   return pose_array_msg;
-// }
+  return pose_array_msg;
+}
 
 
 
@@ -115,8 +115,8 @@ visualization_msgs::msg::MarkerArray MsgConverter::createParticleCloudMarkerArra
     marker.pose.orientation.w = q.w();
 
     marker.scale.x = 0.2;  // 矢印の長さ
-    marker.scale.y = 0.05; // 矢印の幅
-    marker.scale.z = 0.05; // 矢印の高さ
+    marker.scale.y = 0.02; // 矢印の幅
+    marker.scale.z = 0.02; // 矢印の高さ
 
     // float normalized_score = particle.score / max_score;
     float normalized_score;

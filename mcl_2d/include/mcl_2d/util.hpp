@@ -1,3 +1,5 @@
+#pragma once
+
 #include <iostream>
 #include <vector>
 #include <eigen3/Eigen/Dense>
@@ -10,6 +12,6 @@ class Util {
  public:
   double quaternionToYaw(const double& w, const double& x, const double& y, const double& z);
   vector<LaserPoint> transformToMapCoordinates(const std::vector<LaserPoint>& src_points, const Vector3f& pose);
-
+  double normalizeAngle(double angle);
  private:
 };

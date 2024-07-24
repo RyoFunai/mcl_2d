@@ -36,3 +36,9 @@ std::vector<LaserPoint> Util::transformToMapCoordinates(const std::vector<LaserP
   }
   return map_points;
 }
+
+double Util::normalizeAngle(double angle) {
+    while (angle > M_PI) angle -= 2 * M_PI;
+    while (angle <= -M_PI) angle += 2 * M_PI;
+    return angle;
+}

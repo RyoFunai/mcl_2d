@@ -16,7 +16,7 @@ void Mcl2d::setup(const string& yaml_path, const vector<double>& odom_convarianc
 void Mcl2d::loadMap(const string& yaml_path) {
   filesystem::path yaml_file_path = yaml_path;
   YAML::Node config = YAML::LoadFile(yaml_file_path.string());
-  filesystem::path image_path = yaml_file_path.parent_path() / config["image"].as<string>();
+  filesystem::path image_path = yaml_file_path.parent_path() / config["likelihood_image"].as<string>();
   image_resolution = config["resolution"].as<double>();
   vector<double> origin = config["origin"].as<vector<double>>();
   map_origin << origin[0], origin[1], origin[2];
@@ -25,6 +25,7 @@ void Mcl2d::loadMap(const string& yaml_path) {
   // double free_thresh = config["free_thresh"].as<double>();
 
   map_image = cv::imread(image_path, cv::IMREAD_GRAYSCALE);
+
   if (map_image.empty()) {
     RCLCPP_ERROR(rclcpp::get_logger("mcl_2d"), "Failed to load map image: %s", image_path.c_str());
     exit(0);
@@ -48,24 +49,36 @@ void Mcl2d::loadMap(const string& yaml_path) {
 
 Vector3f Mcl2d::updateData(const Vector3f& pose, const vector<LaserPoint>& src_points, const int particles_num) {
   diff_pose = pose - pre_pose;
+  diff_pose.z() = util.normalizeAngle(diff_pose.z());
+  RCLCPP_INFO(rclcpp::get_logger("mcl_2d"), "pose     : %f, %f, %f", pose.x(), pose.y(), pose.z());
+  // RCLCPP_INFO(rclcpp::get_logger("mcl_2d"), "pre_pose : %f, %f, %f", pre_pose.x(), pre_pose.y(), pre_pose.z());
+  // RCLCPP_INFO(rclcpp::get_logger("mcl_2d"), "diff_pose: %f, %f, %f", diff_pose.x(), diff_pose.y(), diff_pose.z());
   auto start = std::chrono::high_resolution_clock::now();  // 計測開始
-  RCLCPP_INFO(rclcpp::get_logger("mcl_2d"), "Updating data...");
+
   if (is_first_time) {
     particles = generate_particles_normal(pose, particles_num);
     is_first_time = false;
   } else {
     sampling(diff_pose, particles);
   }
+
+  // particles = generate_particles_normal(pose, particles_num);
+
   likelihood(src_points, particles);
+  RCLCPP_INFO(rclcpp::get_logger("mcl_2d"), "updateData function took %lld ms", std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).count());
+
   if (normalizeBelief(particles) > 1.0E-6) {
-    systematic_resample(particles);
+    simple_resample(particles);
   } else {
     // resetWeight();
     RCLCPP_WARN(rclcpp::get_logger("mcl_2d"), "No particle with positive score");
   }
   Vector3f current_pose = estimate_current_pose(particles);
+  RCLCPP_INFO(rclcpp::get_logger("mcl_2d"), "current_pose: %f, %f, %f", current_pose.x(), current_pose.y(), current_pose.z());
 
-  RCLCPP_INFO(rclcpp::get_logger("mcl_2d"), "updateData function took %lld ms", std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).count());
+  Vector3f est_diff_pose = current_pose - pose;
+  est_diff_pose.z() = util.normalizeAngle(est_diff_pose.z());
+  RCLCPP_INFO(rclcpp::get_logger("mcl_2d"), "est_diff_pose: %f, %f, %f", est_diff_pose.x(), est_diff_pose.y(), est_diff_pose.z());
 
   pre_pose = current_pose;
 
@@ -76,8 +89,8 @@ Vector3f Mcl2d::updateData(const Vector3f& pose, const vector<LaserPoint>& src_p
 vector<Particle> Mcl2d::generate_particles_normal(const Vector3f& pose, const int particles_num) {
   vector<Particle> particles;
 
-  std::normal_distribution<float> x_pos(pose.x(), 0.2);
-  std::normal_distribution<float> y_pos(pose.y(), 0.2);
+  std::normal_distribution<float> x_pos(pose.x(), 0.1);
+  std::normal_distribution<float> y_pos(pose.y(), 0.1);
   std::normal_distribution<float> theta_pos(pose.z(), M_PI / 8);
 
   for (int i = 0; i < particles_num; i++) {
@@ -94,46 +107,63 @@ vector<Particle> Mcl2d::generate_particles_normal(const Vector3f& pose, const in
   return particles;
 }
 
+// void Mcl2d::sampling(Vector3f& diffPose, vector<Particle>& particles) {
+//   double delta_length = sqrt(pow(diffPose.x(), 2) + pow(diffPose.y(), 2));
+//   double delta_rot1 = atan2(diffPose.y(), diffPose.x());  //始点角度差分
+//   double delta_rot2 = diffPose.z() - delta_rot1;  //終点角度差分
+
+//   RCLCPP_INFO(rclcpp::get_logger("mcl_2d"), "diffPose: %f, %f, %f", diffPose.x(), diffPose.y(), diffPose.z() * 180 / M_PI);
+//   RCLCPP_INFO(rclcpp::get_logger("mcl_2d"), "delta_length: %f, delta_rot1: %f, delta_rot2: %f", delta_length, delta_rot1 * 180 / M_PI, delta_rot2 * 180 / M_PI);
+
+//   std::default_random_engine generator;
+//   if (delta_rot1 > M_PI)
+//     delta_rot1 -= (2 * M_PI);
+//   if (delta_rot1 < -M_PI)
+//     delta_rot1 += (2 * M_PI);
+//   if (delta_rot2 > M_PI)
+//     delta_rot2 -= (2 * M_PI);
+//   if (delta_rot2 < -M_PI)
+//     delta_rot2 += (2 * M_PI);
+//   //// Add noises to trans/rot1/rot2
+//   double trans_noise_coeff = odom_convariance_[2] * fabs(delta_length) + odom_convariance_[3] * fabs(delta_rot1 + delta_rot2);
+//   double rot1_noise_coeff = odom_convariance_[0] * fabs(delta_rot1) + odom_convariance_[1] * fabs(delta_length);
+//   double rot2_noise_coeff = odom_convariance_[0] * fabs(delta_rot2) + odom_convariance_[1] * fabs(delta_length);
+
+//   float scoreSum = 0;
+//   for (int i = 0; i < particles.size(); i++) {
+//     std::normal_distribution<double> gaussian_distribution(0, 1);
+
+//     delta_length = delta_length + gaussian_distribution(gen) * trans_noise_coeff;
+//     delta_rot1 = delta_rot1 + gaussian_distribution(gen) * rot1_noise_coeff;
+//     delta_rot2 = delta_rot2 + gaussian_distribution(gen) * rot2_noise_coeff;
+
+//     double x = delta_length * cos(delta_rot1) + gaussian_distribution(gen) * odom_convariance_[4];
+//     double y = delta_length * sin(delta_rot1) + gaussian_distribution(gen) * odom_convariance_[5];
+//     double theta = delta_rot1 + delta_rot2 + gaussian_distribution(gen) * odom_convariance_[0] * (M_PI / 180.0);
+
+//     Eigen::Matrix3f diff_odom_w_noise = Eigen::Matrix3f::Identity();
+//     diff_odom_w_noise(0, 2) = x;
+//     diff_odom_w_noise(1, 2) = y;
+//     diff_odom_w_noise.block<2, 2>(0, 0) = Eigen::Rotation2Df(theta).toRotationMatrix();
+
+//     particles.at(i).pose = particles.at(i).pose * diff_odom_w_noise;
+//   }
+// }
 void Mcl2d::sampling(Vector3f& diffPose, vector<Particle>& particles) {
-  double delta_length = sqrt(pow(diffPose.x(), 2) + pow(diffPose.y(), 2));
-  double delta_rot1 = atan2(diffPose.y(), diffPose.x());
-  double delta_rot2 = diffPose.z() - delta_rot1;
+  // 移動量を表す変換行列を作成
+  Eigen::Matrix3f diff_transform = Eigen::Matrix3f::Identity();
+  diff_transform(0, 2) = diffPose.x();
+  diff_transform(1, 2) = diffPose.y();
+  diff_transform.block<2, 2>(0, 0) = Eigen::Rotation2Df(diffPose.z()).toRotationMatrix();
 
-  RCLCPP_INFO(rclcpp::get_logger("mcl_2d"), "diffPose: %f, %f, %f", diffPose.x(), diffPose.y(), diffPose.z()*180/M_PI);
-  RCLCPP_INFO(rclcpp::get_logger("mcl_2d"), "delta_length: %f, delta_rot1: %f, delta_rot2: %f", delta_length, delta_rot1 * 180 / M_PI, delta_rot2 * 180 / M_PI);
+  // 各パーティクルに移動量を適用
+  for (auto& particle : particles) {
+    particle.pose = particle.pose * diff_transform;
 
-  std::default_random_engine generator;
-  if (delta_rot1 > M_PI)
-    delta_rot1 -= (2 * M_PI);
-  if (delta_rot1 < -M_PI)
-    delta_rot1 += (2 * M_PI);
-  if (delta_rot2 > M_PI)
-    delta_rot2 -= (2 * M_PI);
-  if (delta_rot2 < -M_PI)
-    delta_rot2 += (2 * M_PI);
-  //// Add noises to trans/rot1/rot2
-  double trans_noise_coeff = odom_convariance_[2] * fabs(delta_length) + odom_convariance_[3] * fabs(delta_rot1 + delta_rot2);
-  double rot1_noise_coeff = odom_convariance_[0] * fabs(delta_rot1) + odom_convariance_[1] * fabs(delta_length);
-  double rot2_noise_coeff = odom_convariance_[0] * fabs(delta_rot2) + odom_convariance_[1] * fabs(delta_length);
-
-  float scoreSum = 0;
-  for (int i = 0; i < particles.size(); i++) {
-    std::normal_distribution<double> gaussian_distribution(0, 1);
-
-    delta_length = delta_length + gaussian_distribution(gen) * trans_noise_coeff;
-    delta_rot1 = delta_rot1 + gaussian_distribution(gen) * rot1_noise_coeff;
-    delta_rot2 = delta_rot2 + gaussian_distribution(gen) * rot2_noise_coeff;
-
-    double x = delta_length * cos(delta_rot1) + gaussian_distribution(gen) * odom_convariance_[4];
-    double y = delta_length * sin(delta_rot1) + gaussian_distribution(gen) * odom_convariance_[5];
-    double theta = delta_rot1 + delta_rot2 + gaussian_distribution(gen) * odom_convariance_[0] * (M_PI / 180.0);
-
-    Eigen::Matrix3f diff_odom_w_noise = Eigen::Matrix3f::Identity();
-    diff_odom_w_noise(0, 2) = x;
-    diff_odom_w_noise(1, 2) = y;
-    diff_odom_w_noise.block<2, 2>(0, 0) = Eigen::Rotation2Df(theta).toRotationMatrix();
-
-    particles.at(i).pose = particles.at(i).pose * diff_odom_w_noise;
+    // パーティクルの角度も正規化
+    double current_angle = atan2(particle.pose(1, 0), particle.pose(0, 0));
+    double normalized_angle = util.normalizeAngle(current_angle);
+    particle.pose.block<2, 2>(0, 0) = Eigen::Rotation2Df(normalized_angle).toRotationMatrix();
   }
 }
 
@@ -160,6 +190,30 @@ void Mcl2d::likelihood(const vector<LaserPoint>& src_points, vector<Particle>& p
       max_score = particle.score;
     }
   }
+}
+
+void Mcl2d::simple_resample(vector<Particle>& particles) {
+  vector<Particle> new_particles;
+  new_particles.reserve(particles.size());
+
+  // 累積重みの計算
+  vector<double> cumulative_weights(particles.size());
+  cumulative_weights[0] = particles[0].score;
+  for (size_t i = 1; i < particles.size(); ++i) {
+    cumulative_weights[i] = cumulative_weights[i - 1] + particles[i].score;
+  }
+
+  // リサンプリング
+  std::uniform_real_distribution<double> dist(0.0, 1.0);
+  for (size_t i = 0; i < particles.size(); ++i) {
+    double random_weight = dist(gen) * cumulative_weights.back();
+    auto it = std::lower_bound(cumulative_weights.begin(), cumulative_weights.end(), random_weight);
+    size_t index = std::distance(cumulative_weights.begin(), it);
+    new_particles.push_back(particles[index]);
+    new_particles.back().score = 1.0 / particles.size();  // 重みをリセット
+  }
+
+  particles = std::move(new_particles);
 }
 
 void Mcl2d::systematic_resample(vector<Particle>& particles) {
@@ -202,6 +256,36 @@ double Mcl2d::normalizeBelief(vector<Particle>& particles) {
   return sum;
 }
 
+// double Mcl2d::normalizeBelief(vector<Particle>& particles) {
+//   double sum = 0.0;
+//   double min_score = std::numeric_limits<double>::max();
+//   double max_score = std::numeric_limits<double>::lowest();
+
+//   // 最小値と最大値を見つける
+//   for (const auto& p : particles) {
+//     sum += p.score;
+//     min_score = std::min(min_score, static_cast<double>(p.score));
+//     max_score = std::max(max_score, static_cast<double>(p.score));
+//   }
+
+//   if (sum < 1.0E-12 || max_score == min_score) {
+//     // すべての重みが同じ場合や、合計が非常に小さい場合は均等に分配
+//     double uniform_weight = 1.0 / particles.size();
+//     for (auto& p : particles) {
+//       p.score = uniform_weight;
+//     }
+//     return sum;
+//   }
+
+//   // 正規化と0-1スケーリングを同時に行う
+//   for (auto& p : particles) {
+//     p.score = (p.score - min_score) / (max_score - min_score);
+//   }
+
+//   return sum;
+// }
+
+
 Vector3f Mcl2d::estimate_current_pose(const vector<Particle>& particles) {
   Vector3f pose = Vector3f::Zero();
 
@@ -212,10 +296,10 @@ Vector3f Mcl2d::estimate_current_pose(const vector<Particle>& particles) {
     float r21 = 0;
     for (int i = 0; i < (int)particles.size(); i++) {
       float const score = particles.at(i).score;
-      x_all = x_all + particles.at(i).pose(0, 2) * score;
-      y_all = y_all + particles.at(i).pose(1, 2) * score;
-      r11 = r11 + particles.at(i).pose(0, 0) * score;
-      r21 = r21 + particles.at(i).pose(1, 0) * score;
+      x_all += particles.at(i).pose(0, 2) * score;
+      y_all += particles.at(i).pose(1, 2) * score;
+      r11 += particles.at(i).pose(0, 0) * score;
+      r21 += particles.at(i).pose(1, 0) * score;
     }
     pose.x() = (double)x_all;
     pose.y() = (double)y_all;
@@ -224,6 +308,7 @@ Vector3f Mcl2d::estimate_current_pose(const vector<Particle>& particles) {
   } else {
     RCLCPP_WARN(rclcpp::get_logger("mcl_2d"), "No particle with positive score");
   }
+  RCLCPP_INFO(rclcpp::get_logger("mcl_2d"), "est pose : %f, %f, %f", pose.x(), pose.y(), pose.z());
   return pose;
 }
 

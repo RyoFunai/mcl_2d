@@ -7,6 +7,9 @@
 #include <rclcpp/rclcpp.hpp>
 
 #include "scan.hpp"
+#include "mcl_2d/util.hpp"
+
+
 struct Particle {
   Eigen::Matrix3f pose;
   float score;
@@ -28,6 +31,9 @@ class Mcl2d {
   void likelihood(const vector<LaserPoint>& src_points, vector<Particle>& particles);
   vector<Particle> generate_particles_normal(const Vector3f& initial_pose, const int particles_num);
   void sampling(Vector3f& diffPose, vector<Particle>& particles);
+  vector<Particle> kldSampling(const Vector3f& mean_pose, const int max_particles);
+  double generateGaussianNoise(double mean, double stddev);
+  void simple_resample(vector<Particle>& particles);
   void systematic_resample(vector<Particle>& particles);
   Vector3f estimate_current_pose(const vector<Particle>& particles);
   double normalizeBelief(vector<Particle>& particles);
@@ -36,6 +42,8 @@ class Mcl2d {
   pair<float, float> pixelToMap(const int& x, const int& y);
   void displayPointOnMap(const float& x, const float& y);
   static void onMouse(int event, int x, int y, int, void* userdata);
+
+  Util util;
 
   cv::Mat map_image;
   rclcpp::Node::SharedPtr node_;
@@ -47,4 +55,6 @@ class Mcl2d {
   bool is_first_time{true};
   vector<double> odom_convariance_;
   vector<Particle> particles;
+
+
 };
