@@ -285,29 +285,94 @@ double Mcl2d::normalizeBelief(vector<Particle>& particles) {
 //   return sum;
 // }
 
+// Vector3f Mcl2d::estimate_current_pose(const vector<Particle>& particles) {
+//   Vector3f pose = Vector3f::Zero();
+//   double total_weight = 0.0;
+//   double cos_sum = 0.0;
+//   double sin_sum = 0.0;
 
+//   for (const auto& particle : particles) {
+//     double weight = particle.score;
+//     total_weight += weight;
+
+//     // 位置の重み付き和を計算
+//     pose.x() += particle.pose(0, 2) * weight;
+//     pose.y() += particle.pose(1, 2) * weight;
+
+//     // 角度の重み付きsin和とcos和を計算
+//     double angle = atan2(particle.pose(1, 0), particle.pose(0, 0));
+//     cos_sum += cos(angle) * weight;
+//     sin_sum += sin(angle) * weight;
+//   }
+
+//   if (total_weight > 0) {
+//     // 重み付き平均を計算
+//     pose.x() /= total_weight;
+//     pose.y() /= total_weight;
+//     pose.z() = atan2(sin_sum, cos_sum);
+//   } else {
+//     RCLCPP_WARN(rclcpp::get_logger("mcl_2d"), "Total weight is zero, cannot estimate pose");
+//   }
+
+//   RCLCPP_INFO(rclcpp::get_logger("mcl_2d"), "est pose : %f, %f, %f", pose.x(), pose.y(), pose.z());
+//   return pose;
+// }
 Vector3f Mcl2d::estimate_current_pose(const vector<Particle>& particles) {
   Vector3f pose = Vector3f::Zero();
 
-  if (highest_weight_particle.score > 0) {
+  // if (highest_weight_particle.score > 0) {
     float x_all = 0;
     float y_all = 0;
-    float r11 = 0;
-    float r21 = 0;
+    float r11_all = 0;
+    float r21_all = 0;
     for (int i = 0; i < (int)particles.size(); i++) {
       float const score = particles.at(i).score;
       x_all += particles.at(i).pose(0, 2) * score;
       y_all += particles.at(i).pose(1, 2) * score;
-      r11 += particles.at(i).pose(0, 0) * score;
-      r21 += particles.at(i).pose(1, 0) * score;
+      r11_all += particles.at(i).pose(0, 0) * score;
+      r21_all += particles.at(i).pose(1, 0) * score;
+      RCLCPP_INFO(rclcpp::get_logger("mcl_2d"), "particle %d: x: %f, y: %f, r11: %f, r21: %f, score: %f", i, particles.at(i).pose(0, 2), particles.at(i).pose(1, 2), particles.at(i).pose(0, 0), particles.at(i).pose(1, 0), particles.at(i).score);
+      RCLCPP_INFO(rclcpp::get_logger("mcl_2d"), "x_all: %f, y_all: %f, r11_all: %f, r21_all: %f", x_all, y_all, r11_all, r21_all);
     }
     pose.x() = (double)x_all;
     pose.y() = (double)y_all;
-    pose.z() = (double)atan2f(r21, r11);
+    pose.z() = (double)atan2f(r21_all, r11_all);
     // RCLCPP_INFO(rclcpp::get_logger("mcl_2d"), "Highest Weight Particle  x: %f, y: %f, yaw: %f, score: %f", pose[0], pose[1], pose[2], highest_weight_particle.score);
-  } else {
-    RCLCPP_WARN(rclcpp::get_logger("mcl_2d"), "No particle with positive score");
+  // } else {
+  //   RCLCPP_WARN(rclcpp::get_logger("mcl_2d"), "No particle with positive score");
+  // }
+  RCLCPP_INFO(rclcpp::get_logger("mcl_2d"), "est pose : %f, %f, %f", pose.x(), pose.y(), pose.z());
+  return pose;
+}
+
+Vector3f Mcl2d::estimate_current_pose_V3(const vector<ParticleV3>& particles) {
+  Vector3f pose = Vector3f::Zero();
+  double total_weight = 0.0;
+  double cos_sum = 0.0;
+  double sin_sum = 0.0;
+
+  for (const auto& particle : particles) {
+    double weight = particle.score;
+    total_weight += weight;
+
+    // 位置の重み付き和を計算
+    pose.x() += particle.pose.x() * weight;
+    pose.y() += particle.pose.y() * weight;
+
+    // 角度の重み付きsin和とcos和を計算
+    cos_sum += cos(particle.pose.z()) * weight;
+    sin_sum += sin(particle.pose.z()) * weight;
   }
+
+  if (total_weight > 0) {
+    // 重み付き平均を計算
+    pose.x() /= total_weight;
+    pose.y() /= total_weight;
+    pose.z() = atan2(sin_sum, cos_sum);
+  } else {
+    RCLCPP_WARN(rclcpp::get_logger("mcl_2d"), "Total weight is zero, cannot estimate pose");
+  }
+
   RCLCPP_INFO(rclcpp::get_logger("mcl_2d"), "est pose : %f, %f, %f", pose.x(), pose.y(), pose.z());
   return pose;
 }

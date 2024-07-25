@@ -16,6 +16,11 @@ struct Particle {
   Eigen::Matrix3f pose;
   float score;
 };
+struct ParticleV3 {
+  Eigen::Vector3f pose;
+  float score;
+};
+
 using namespace Eigen;
 using namespace std;
 
@@ -28,6 +33,7 @@ class MCL2D_CORE_EXPORT Mcl2d {
   std::vector<LaserPoint> getOverlappingPoints(const Vector3f& position, const std::vector<LaserPoint>& points);
   void displayLaserPoints(const std::vector<LaserPoint>& points);
   Vector3f estimate_current_pose(const vector<Particle>& particles);
+  Vector3f estimate_current_pose_V3(const vector<ParticleV3>& particles);
 
  private:
   void loadMap(const string& yaml_path);
