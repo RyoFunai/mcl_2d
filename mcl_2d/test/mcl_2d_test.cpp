@@ -53,9 +53,12 @@ TEST_F(Mcl2dTest, EstimateCurrentPoseMultipleParticles) {
   std::cout << "*********************************************" << std::endl;
 
   vector<ParticleV3> particles_v3;
-  particles_v3.push_back({Vector3f(1.0, 1.0, 0.0), 0.2f});
-  particles_v3.push_back({Vector3f(2.0, 2.0, M_PI / 2), 0.3f});
-  particles_v3.push_back({Vector3f(3.0, 3.0, M_PI), 0.5f});
+  particles_v3.push_back({Vector3f(2.0, 2.0, -1.1), 0.1f});
+  // particles_v3.push_back({Vector3f(2.0, 2.0, -1.1), 0.2f});
+  // particles_v3.push_back({Vector3f(2.0, 2.0, -1), 0.2f});
+  // particles_v3.push_back({Vector3f(3.0, 3.0, 3.14), 0.2f});
+  // particles_v3.push_back({Vector3f(3.0, 3.0, 3.14), 0.2f});
+  particles_v3.push_back({Vector3f(3.0, 3.0, 3.14), 0.9f});
 
   Vector3f result_v3 = mcl.estimate_current_pose_V3(particles_v3);
 

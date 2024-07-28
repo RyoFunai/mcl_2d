@@ -32,7 +32,6 @@ class MCL2D_CORE_EXPORT Mcl2d {
   Vector3f updateData(const Vector3f& pose, const vector<LaserPoint>& src_points, const int particles_num);
   std::vector<LaserPoint> getOverlappingPoints(const Vector3f& position, const std::vector<LaserPoint>& points);
   void displayLaserPoints(const std::vector<LaserPoint>& points);
-  Vector3f estimate_current_pose(const vector<Particle>& particles);
   Vector3f estimate_current_pose_V3(const vector<ParticleV3>& particles);
 
  private:
