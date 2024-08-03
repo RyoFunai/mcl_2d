@@ -1,22 +1,16 @@
 #pragma once
 
-#include "mcl_2d/visibility_control.hpp"
-
 #include <cmath>
 #include <eigen3/Eigen/Dense>
 #include <opencv2/opencv.hpp>
 #include <random>
 #include <rclcpp/rclcpp.hpp>
 
-#include "scan.hpp"
 #include "mcl_2d/util.hpp"
-
+#include "mcl_2d/visibility_control.hpp"
+#include "scan.hpp"
 
 struct Particle {
-  Eigen::Matrix3f pose;
-  float score;
-};
-struct ParticleV3 {
   Eigen::Vector3f pose;
   float score;
 };
@@ -32,7 +26,7 @@ class MCL2D_CORE_EXPORT Mcl2d {
   Vector3f updateData(const Vector3f& pose, const vector<LaserPoint>& src_points, const int particles_num);
   std::vector<LaserPoint> getOverlappingPoints(const Vector3f& position, const std::vector<LaserPoint>& points);
   void displayLaserPoints(const std::vector<LaserPoint>& points);
-  Vector3f estimate_current_pose_V3(const vector<ParticleV3>& particles);
+  Vector3f estimate_current_pose(const vector<Particle>& particles);
 
  private:
   void loadMap(const string& yaml_path);
@@ -62,6 +56,4 @@ class MCL2D_CORE_EXPORT Mcl2d {
   bool is_first_time{true};
   vector<double> odom_convariance_;
   vector<Particle> particles;
-
-
 };

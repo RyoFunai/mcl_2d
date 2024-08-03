@@ -67,6 +67,7 @@ void Mcl2dNode::loop() {
 
   vector<LaserPoint> src_points = msg_converter.scan_to_vector(laser_msg);
   estimated_pose_ = mcl_2d.updateData(predicted_pose, src_points, particles_num_);
+
   // vector<LaserPoint> overlapping_points = mcl_2d.getOverlappingPoints(current_odom, src_points);
   vector<LaserPoint> map_points = util.transformToMapCoordinates(src_points, estimated_pose_);
   sensor_msgs::msg::PointCloud2 cloud = msg_converter.vector_to_PC2(map_points);
@@ -77,6 +78,11 @@ void Mcl2dNode::loop() {
   tf_broadcaster->sendTransform(world_to_base_link);
   tf_broadcaster->sendTransform(base_link_to_lidar);
   publish_particle();
+
+  // count++;
+  // if (count > 5) {
+  //   exit(0);
+  // }
 }
 
 void Mcl2dNode::initTF() {
@@ -141,16 +147,11 @@ bool Mcl2dNode::getLidarPose(Vector3f& pose) {
 }
 
 void Mcl2dNode::publish_particle() {
-  auto marker_array = msg_converter.createParticleCloudMarkerArray(mcl_2d.getParticles());
-  particle_marker_publisher->publish(marker_array);
+  // auto marker_array = msg_converter.createParticleCloudMarkerArray(mcl_2d.getParticles());
+  // particle_marker_publisher->publish(marker_array);
 
-
-  std::vector<Particle> particles = mcl_2d.getParticles();
-  for (int i = 0; i < particles.size(); i++) {
-    // RCLCPP_INFO(get_logger(), "particle score: %f", particles[i].score);
-  }
-  // auto pose_array_msg = msg_converter.createParticleCloud(particles);
-  // particle_publisher->publish(pose_array_msg);
+  auto pose_array_msg = msg_converter.createParticleCloud(mcl_2d.getParticles());
+  particle_publisher->publish(pose_array_msg);
 
   // std::vector<Particle> resampled_particles = mcl_2d.getResampledParticles();
   // auto resampled_pose_array_msg = msg_converter.createParticleCloud(resampled_particles);

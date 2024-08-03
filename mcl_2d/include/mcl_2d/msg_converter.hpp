@@ -1,7 +1,5 @@
 #pragma once
 
-#include "mcl_2d/visibility_control.hpp"
-
 #include <geometry_msgs/msg/transform_stamped.h>
 #include <tf2_ros/transform_broadcaster.h>
 
@@ -11,11 +9,12 @@
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/laser_scan.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
-#include <visualization_msgs/msg/marker_array.hpp>
 #include <vector>
+#include <visualization_msgs/msg/marker_array.hpp>
 
 #include "mcl_2d/mcl_2d.hpp"
 #include "mcl_2d/scan.hpp"
+#include "mcl_2d/visibility_control.hpp"
 
 using namespace std;
 using namespace Eigen;

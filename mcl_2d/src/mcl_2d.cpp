@@ -86,6 +86,26 @@ Vector3f Mcl2d::updateData(const Vector3f& pose, const vector<LaserPoint>& src_p
   return current_pose;
 }
 
+// vector<Particle> Mcl2d::generate_particles_normal(const Vector3f& pose, const int particles_num) {
+//   vector<Particle> particles;
+
+//   std::normal_distribution<float> x_pos(pose.x(), 0.1);
+//   std::normal_distribution<float> y_pos(pose.y(), 0.1);
+//   std::normal_distribution<float> theta_pos(pose.z(), M_PI / 8);
+
+//   for (int i = 0; i < particles_num; i++) {
+//     Particle particle_temp;
+
+//     particle_temp.pose = Eigen::Matrix3f::Identity();
+//     particle_temp.pose(0, 2) = x_pos(gen);
+//     particle_temp.pose(1, 2) = y_pos(gen);
+//     particle_temp.pose.block<2, 2>(0, 0) = Eigen::Rotation2Df(theta_pos(gen)).toRotationMatrix();
+
+//     particle_temp.score = 1 / (double)particles_num;
+//     particles.push_back(particle_temp);
+//   }
+//   return particles;
+// }
 vector<Particle> Mcl2d::generate_particles_normal(const Vector3f& pose, const int particles_num) {
   vector<Particle> particles;
 
@@ -96,17 +116,15 @@ vector<Particle> Mcl2d::generate_particles_normal(const Vector3f& pose, const in
   for (int i = 0; i < particles_num; i++) {
     Particle particle_temp;
 
-    particle_temp.pose = Eigen::Matrix3f::Identity();
-    particle_temp.pose(0, 2) = x_pos(gen);
-    particle_temp.pose(1, 2) = y_pos(gen);
-    particle_temp.pose.block<2, 2>(0, 0) = Eigen::Rotation2Df(theta_pos(gen)).toRotationMatrix();
+    particle_temp.pose.x() = x_pos(gen);
+    particle_temp.pose.y() = y_pos(gen);
+    particle_temp.pose.z() = theta_pos(gen);
 
     particle_temp.score = 1 / (double)particles_num;
     particles.push_back(particle_temp);
   }
   return particles;
 }
-
 // void Mcl2d::sampling(Vector3f& diffPose, vector<Particle>& particles) {
 //   double delta_length = sqrt(pow(diffPose.x(), 2) + pow(diffPose.y(), 2));
 //   double delta_rot1 = atan2(diffPose.y(), diffPose.x());  //始点角度差分
@@ -149,23 +167,38 @@ vector<Particle> Mcl2d::generate_particles_normal(const Vector3f& pose, const in
 //     particles.at(i).pose = particles.at(i).pose * diff_odom_w_noise;
 //   }
 // }
+
 void Mcl2d::sampling(Vector3f& diffPose, vector<Particle>& particles) {
-  // 移動量を表す変換行列を作成
-  Eigen::Matrix3f diff_transform = Eigen::Matrix3f::Identity();
-  diff_transform(0, 2) = diffPose.x();
-  diff_transform(1, 2) = diffPose.y();
-  diff_transform.block<2, 2>(0, 0) = Eigen::Rotation2Df(diffPose.z()).toRotationMatrix();
-
-  // 各パーティクルに移動量を適用
   for (auto& particle : particles) {
-    particle.pose = particle.pose * diff_transform;
+    // Apply translation
+    particle.pose.x() += diffPose.x() * cos(particle.pose.z()) - diffPose.y() * sin(particle.pose.z());
+    particle.pose.y() += diffPose.x() * sin(particle.pose.z()) + diffPose.y() * cos(particle.pose.z());
 
-    // パーティクルの角度も正規化
-    double current_angle = atan2(particle.pose(1, 0), particle.pose(0, 0));
-    double normalized_angle = util.normalizeAngle(current_angle);
-    particle.pose.block<2, 2>(0, 0) = Eigen::Rotation2Df(normalized_angle).toRotationMatrix();
+    // Apply rotation
+    particle.pose.z() += diffPose.z();
+
+    // Normalize angle
+    particle.pose.z() = util.normalizeAngle(particle.pose.z());
   }
 }
+
+// void Mcl2d::sampling(Vector3f& diffPose, vector<Particle>& particles) {
+//   // 移動量を表す変換行列を作成
+//   Eigen::Matrix3f diff_transform = Eigen::Matrix3f::Identity();
+//   diff_transform(0, 2) = diffPose.x();
+//   diff_transform(1, 2) = diffPose.y();
+//   diff_transform.block<2, 2>(0, 0) = Eigen::Rotation2Df(diffPose.z()).toRotationMatrix();
+
+//   // 各パーティクルに移動量を適用
+//   for (auto& particle : particles) {
+//     particle.pose = particle.pose * diff_transform;
+
+//     // パーティクルの角度も正規化
+//     double current_angle = atan2(particle.pose(1, 0), particle.pose(0, 0));
+//     double normalized_angle = util.normalizeAngle(current_angle);
+//     particle.pose.block<2, 2>(0, 0) = Eigen::Rotation2Df(normalized_angle).toRotationMatrix();
+//   }
+// }
 
 void Mcl2d::likelihood(const vector<LaserPoint>& src_points, vector<Particle>& particles) {
   float max_score = 0;
@@ -173,8 +206,9 @@ void Mcl2d::likelihood(const vector<LaserPoint>& src_points, vector<Particle>& p
     float weight = 0;
 
     for (auto& point : src_points) {
-      Eigen::Vector3f laser_point(point.x, point.y, 1);
-      Eigen::Vector3f map_point = particle.pose * laser_point;
+      Eigen::Vector2f laser_point(point.x, point.y);
+      Eigen::Rotation2Df rotation(particle.pose.z());
+      Eigen::Vector2f map_point = rotation * laser_point + particle.pose.head<2>();
       auto [image_pt_x, image_pt_y] = mapToPixel(map_point.x(), map_point.y());
 
       if (image_pt_x < 0 || image_pt_x >= map_image.cols || image_pt_y < 0 || image_pt_y >= map_image.rows)
@@ -191,6 +225,30 @@ void Mcl2d::likelihood(const vector<LaserPoint>& src_points, vector<Particle>& p
     }
   }
 }
+// void Mcl2d::likelihood(const vector<LaserPoint>& src_points, vector<Particle>& particles) {
+//   float max_score = 0;
+//   for (auto& particle : particles) {
+//     float weight = 0;
+
+//     for (auto& point : src_points) {
+//       Eigen::Vector3f laser_point(point.x, point.y, 1);
+//       Eigen::Vector3f map_point = particle.pose * laser_point;
+//       auto [image_pt_x, image_pt_y] = mapToPixel(map_point.x(), map_point.y());
+
+//       if (image_pt_x < 0 || image_pt_x >= map_image.cols || image_pt_y < 0 || image_pt_y >= map_image.rows)
+//         continue;
+//       else {
+//         double pixel_val = (255 - map_image.at<uchar>(image_pt_y, image_pt_x)) / (double)255;
+//         weight += pixel_val;
+//       }
+//     }
+//     particle.score += weight / src_points.size();
+//     if (max_score < particle.score) {
+//       highest_weight_particle = particle;
+//       max_score = particle.score;
+//     }
+//   }
+// }
 
 void Mcl2d::simple_resample(vector<Particle>& particles) {
   vector<Particle> new_particles;
@@ -318,7 +376,7 @@ double Mcl2d::normalizeBelief(vector<Particle>& particles) {
 //   return pose;
 // }
 
-Vector3f Mcl2d::estimate_current_pose_V3(const vector<ParticleV3>& particles) {
+Vector3f Mcl2d::estimate_current_pose(const vector<Particle>& particles) {
   Vector3f pose = Vector3f::Zero();
   double total_weight = 0.0;
   double cos_sum = 0.0;

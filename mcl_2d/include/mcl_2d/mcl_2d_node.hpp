@@ -58,6 +58,7 @@ class Mcl2dNode : public rclcpp::Node {
   rclcpp::Time scan_time_stamp_;
   double transform_tolerance_;
   int particles_num_;
+  int count = 0;
 
   Vector3f initial_pose_ = Vector3f::Zero();
   Vector3f last_odom_ = Vector3f::Zero();
