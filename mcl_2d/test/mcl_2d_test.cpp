@@ -1,6 +1,7 @@
 #include "mcl_2d/mcl_2d.hpp"
 
 #include <gtest/gtest.h>
+
 #include <iostream>
 
 class TestPrinter : public testing::EmptyTestEventListener {
@@ -22,18 +23,14 @@ class Mcl2dTest : public ::testing::Test {
     // テスト後のクリーンアップ
   }
 
-  Particle createParticle(double x, double y, double theta, float weight) {
-    Eigen::Matrix3f pose = Eigen::Matrix3f::Identity();
-    pose(0, 2) = static_cast<float>(x);
-    pose(1, 2) = static_cast<float>(y);
-    pose.block<2, 2>(0, 0) = Eigen::Rotation2Df(static_cast<float>(theta)).toRotationMatrix();
-    return {pose, weight};
+  Particle createParticle(double x, double y, double theta, double weight) {
+    return {Vector3f(static_cast<float>(x), static_cast<float>(y), static_cast<float>(theta)), static_cast<float>(weight)};
   }
 };
 
 TEST_F(Mcl2dTest, EstimateCurrentPoseSingleParticle) {
   vector<Particle> particles;
-  particles.push_back(createParticle(1.0, 2.0, M_PI / 4, 1.0f));
+  particles.push_back(createParticle(1.0, 2.0, M_PI / 4, 1.0));
 
   Vector3f result = mcl.estimate_current_pose(particles);
 
@@ -44,31 +41,18 @@ TEST_F(Mcl2dTest, EstimateCurrentPoseSingleParticle) {
 
 TEST_F(Mcl2dTest, EstimateCurrentPoseMultipleParticles) {
   vector<Particle> particles;
-  particles.push_back(createParticle(1.0, 1.0, 0.0, 0.2f));
-  particles.push_back(createParticle(2.0, 2.0, M_PI, 0.3f));
-  particles.push_back(createParticle(3.0, 3.0, M_PI, 0.5f));
+  particles.push_back({Vector3f(2.0, 2.0, -1.1), 0.1f});
+  // particles.push_back({Vector3f(2.0, 2.0, -1.1), 0.2f});
+  // particles.push_back({Vector3f(2.0, 2.0, -1), 0.2f});
+  // particles.push_back({Vector3f(3.0, 3.0, 3.14), 0.2f});
+  // particles.push_back({Vector3f(3.0, 3.0, 3.14), 0.2f});
+  particles.push_back({Vector3f(3.0, 3.0, 3.14), 0.9f});
 
   Vector3f result = mcl.estimate_current_pose(particles);
 
-  std::cout << "*********************************************" << std::endl;
-
-  vector<ParticleV3> particles_v3;
-  particles_v3.push_back({Vector3f(2.0, 2.0, -1.1), 0.1f});
-  // particles_v3.push_back({Vector3f(2.0, 2.0, -1.1), 0.2f});
-  // particles_v3.push_back({Vector3f(2.0, 2.0, -1), 0.2f});
-  // particles_v3.push_back({Vector3f(3.0, 3.0, 3.14), 0.2f});
-  // particles_v3.push_back({Vector3f(3.0, 3.0, 3.14), 0.2f});
-  particles_v3.push_back({Vector3f(3.0, 3.0, 3.14), 0.9f});
-
-  Vector3f result_v3 = mcl.estimate_current_pose_V3(particles_v3);
-
-  EXPECT_NEAR(result.x(), 2.0, 1e-6);
-  EXPECT_NEAR(result.y(), 2.0, 1e-6);
-  EXPECT_NEAR(result.z(), M_PI / 4, 1e-6);
-
-  EXPECT_NEAR(result_v3.x(), 2.3, 1e-6);
-  EXPECT_NEAR(result_v3.y(), 2.3, 1e-6);
-  EXPECT_NEAR(result_v3.z(), 2.356194, 1e-6);  // Approximately 3π/4
+  EXPECT_NEAR(result.x(), 2.3, 1e-6);
+  EXPECT_NEAR(result.y(), 2.3, 1e-6);
+  EXPECT_NEAR(result.z(), 2.356194, 1e-6);  // Approximately 3π/4
 }
 
 TEST_F(Mcl2dTest, EstimateCurrentPoseEmptyParticles) {
@@ -93,16 +77,16 @@ TEST_F(Mcl2dTest, EstimateCurrentPoseAngleWrapping) {
   EXPECT_NEAR(result.z(), M_PI, 1e-6);
 }
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
   testing::InitGoogleTest(&argc, argv);
-  
+
   // デフォルトリスナーを削除
   testing::TestEventListeners& listeners = testing::UnitTest::GetInstance()->listeners();
   delete listeners.Release(listeners.default_result_printer());
 
   // カスタムリスナーを追加
   listeners.Append(new TestPrinter);
-  
+
   const char* test_filter = std::getenv("MCL_TEST_FILTER");
   if (test_filter) {
     testing::GTEST_FLAG(filter) = test_filter;
@@ -110,7 +94,7 @@ int main(int argc, char **argv) {
     // デフォルトで特定のテストを実行
     testing::GTEST_FLAG(filter) = "Mcl2dTest.EstimateCurrentPoseEmptyParticles";
   }
-  
+
   return RUN_ALL_TESTS();
 }
 
