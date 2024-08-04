@@ -13,6 +13,7 @@ include_directories(include)
 
 ament_auto_add_library(mcl_2d_core SHARED
   src/mcl_2d.cpp
+  src/particle_sampler.cpp
   src/util.cpp
   src/msg_converter.cpp
 )
